@@ -1,0 +1,19 @@
+{
+  "name": "thai-quotation-copilot",
+  "private": true,
+  "version": "0.0.0",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "echo \"lint: no linter configured yet (ESLint arrives with the web app)\""
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  }
+}
