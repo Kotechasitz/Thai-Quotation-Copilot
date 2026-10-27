@@ -31,3 +31,7 @@ export {
 } from './pricing/compute.ts';
 export { roundHalfUpDiv, formatBaht } from './pricing/money.ts';
 export { bahtText } from './pricing/bahtText.ts';
+export type { CompanyProfile, CustomerInfo, QuoteLine, Quotation } from './quote/model.ts';
+export { formatQuoteNumber, formatThaiDate } from './quote/number.ts';
+export { toJson } from './export/json.ts';
+export { toCsv } from './export/csv.ts';
