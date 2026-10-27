@@ -6,7 +6,9 @@ export default defineConfig({
     alias: { '@': fileURLToPath(new URL('./', import.meta.url)) },
   },
   test: {
-    include: ['test/**/*.test.ts'],
+    include: ['test/**/*.test.{ts,tsx}'],
     environment: 'node',
+    // jsdom needs a real origin, otherwise window.localStorage is unavailable.
+    environmentOptions: { jsdom: { url: 'http://localhost' } },
   },
 });

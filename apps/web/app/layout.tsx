@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import localFont from 'next/font/local';
 import './globals.css';
+import { SiteNav } from '@/components/SiteNav';
 
 // Sarabun (OFL-1.1) is self-hosted from @fontsource - nothing is fetched from Google Fonts at runtime.
 // Fontsource splits Sarabun into a Thai and a Latin file per weight, so two font instances are chained
@@ -33,7 +34,10 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="th" className={`${sarabunLatin.variable} ${sarabunThai.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <SiteNav />
+        {children}
+      </body>
     </html>
   );
 }
