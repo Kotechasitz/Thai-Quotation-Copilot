@@ -35,3 +35,21 @@ export type { CompanyProfile, CustomerInfo, QuoteLine, Quotation } from './quote
 export { formatQuoteNumber, formatThaiDate } from './quote/number.ts';
 export { toJson } from './export/json.ts';
 export { toCsv } from './export/csv.ts';
+export {
+  extractionSchema,
+  matchSchema,
+  type ExtractedRequest,
+  type ExtractedItem,
+  type RawMatch,
+} from './ai/schemas.ts';
+export {
+  EXTRACT_INSTRUCTIONS,
+  MATCH_INSTRUCTIONS,
+  buildExtractPrompt,
+  buildMatchPrompt,
+} from './ai/prompts.ts';
+export {
+  NO_RESULT_REASON,
+  REJECTED_REASON,
+  validateMatches,
+  type MatchStatus, type ValidatedLine } from './ai/validate.ts';
