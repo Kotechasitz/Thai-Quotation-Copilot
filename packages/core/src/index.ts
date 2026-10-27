@@ -35,6 +35,7 @@ export type { CompanyProfile, CustomerInfo, QuoteLine, Quotation } from './quote
 export { formatQuoteNumber, formatThaiDate } from './quote/number.ts';
 export { toJson } from './export/json.ts';
 export { toCsv } from './export/csv.ts';
+export { summaryRows, type SummaryRow } from './export/summary.ts';
 export {
   extractionSchema,
   matchSchema,

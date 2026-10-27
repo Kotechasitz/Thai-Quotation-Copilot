@@ -2,6 +2,7 @@ import { bahtText } from '../pricing/bahtText.ts';
 import type { Discount } from '../pricing/compute.ts';
 import { formatBaht } from '../pricing/money.ts';
 import type { Quotation } from '../quote/model.ts';
+import { summaryRows } from './summary.ts';
 
 const BOM = '﻿';
 const EOL = '\r\n';
@@ -49,16 +50,7 @@ export function toCsv(q: Quotation): string {
     );
   });
 
-  out.push(summary('รวม', formatBaht(t.subtotalSatang)));
-  if (t.billDiscountSatang > 0) {
-    out.push(summary('ส่วนลดท้ายบิล', formatBaht(t.billDiscountSatang)));
-  }
-  out.push(summary(`ภาษีมูลค่าเพิ่ม ${String(q.vatRatePercent)}%`, formatBaht(t.vatSatang)));
-  out.push(summary('ยอดรวมทั้งสิ้น', formatBaht(t.grandTotalSatang)));
-  if (q.whtRatePercent > 0) {
-    out.push(summary(`หัก ณ ที่จ่าย ${String(q.whtRatePercent)}%`, formatBaht(t.whtSatang)));
-    out.push(summary('ยอดชำระสุทธิ', formatBaht(t.netPayableSatang)));
-  }
+  for (const row of summaryRows(q)) out.push(summary(row.label, row.value));
   out.push(summary('ตัวอักษร', bahtText(t.grandTotalSatang)));
 
   return BOM + out.join(EOL);

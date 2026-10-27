@@ -21,7 +21,7 @@
 - **ตรวจ sku ด้วยโค้ด** sku ที่โมเดลตอบต้องอยู่ใน candidate ของบรรทัดนั้น ไม่เช่นนั้นบรรทัดจะเป็น "ไม่พบสินค้า"
 - **ต้องอนุมัติก่อน export** ต้องตรวจและอนุมัติใบเสนอราคา (จำนวนทุกบรรทัดต้องมากกว่า 0) ก่อนจึงพิมพ์หรือส่งออกได้
 - **เซิร์ฟเวอร์ไม่เก็บข้อมูล** เซิร์ฟเวอร์ไม่บันทึกหรือ log ข้อความลูกค้าและ catalog (log แค่จำนวน token เวลา และสถานะ) ข้อมูลของคุณอยู่ในเบราว์เซอร์
-- **เพดานตายตัว** ข้อความไม่เกิน 5,000 ตัวอักษร ไม่เกิน 50 รายการ timeout 60 วินาที และส่ง AI ครั้งละไม่เกิน 10 รายการ
+- **เพดานตายตัว** ข้อความไม่เกิน 5,000 ตัวอักษร ไม่เกิน 50 รายการ deadline ของ AI 60 วินาที และส่ง AI ครั้งละไม่เกิน 10 รายการ
 
 ## เริ่มต้นใช้งาน
 
@@ -115,11 +115,20 @@ npm run eval:daily
    - `GOOGLE_GENERATIVE_AI_API_KEY` สำหรับ `google` หรือ `AI_GATEWAY_API_KEY` สำหรับ `gateway` (แนะนำให้ใช้ key; OIDC บน Vercel ยังไม่ได้ทดสอบในโปรเจกต์นี้)
 6. Deploy ขั้น build ไม่ต้องใช้ตัวแปรของ AI ตัวแปรเหล่านี้ถูกอ่านตอนสร้างใบเสนอราคาเท่านั้น
 
-route จับคู่ตั้งเพดานเวลาไว้ 60 วินาที (`maxDuration = 60`) เมื่อเปิด Fluid Compute (เป็นค่าเริ่มต้น) แพ็กเกจ Hobby ตั้งได้สูงสุด 300 วินาที และ Pro สูงสุด 800 วินาที ([เอกสาร duration ของ Vercel](https://vercel.com/docs/functions/configuring-functions/duration) อ่านเมื่อ 2026-10-27) route นี้ใช้ 60 วินาที ส่วน Node.js เริ่มต้นของ Vercel คือ 24.x ([เอกสารของ Vercel](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions) อ่านเมื่อ 2026-10-27) ตรงกับโปรเจกต์นี้
+route จับคู่ให้ function รันได้นานสูงสุด 90 วินาที (`maxDuration = 90`) ส่วนงาน AI ภายในมี deadline ของตัวเองที่ 60 วินาที (`AI_TIMEOUT_MS`) ถ้าโมเดลช้าเกินจะได้ข้อความ timeout ที่อ่านรู้เรื่องก่อนที่แพลตฟอร์มจะหยุด function เมื่อเปิด Fluid Compute (เป็นค่าเริ่มต้น) แพ็กเกจ Hobby ตั้งได้สูงสุด 300 วินาที และ Pro สูงสุด 800 วินาที ([เอกสาร duration ของ Vercel](https://vercel.com/docs/functions/configuring-functions/duration) อ่านเมื่อ 2026-10-27) ส่วน Node.js เริ่มต้นของ Vercel คือ 24.x ([เอกสารของ Vercel](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions) อ่านเมื่อ 2026-10-27) ตรงกับโปรเจกต์นี้
+
+### ป้องกัน deployment เดโม
+
+`/api/match` ไม่มีระบบล็อกอิน ใครที่มี URL ของ deployment ก็เรียกได้ และทุกครั้งที่เรียกจะใช้โควตาหรือเครดิต AI ของ **คุณ** ถ้าใช้ Google free tier การเรียกพลาดแค่ไม่กี่ครั้ง (crawler ลิงก์ที่ถูกแชร์ต่อ หรือสคริปต์) ก็ทำให้โควตารายวันหมดและเดโมใช้ไม่ได้ ควรเปิด Vercel Deployment Protection ก่อนแชร์ URL:
+
+- **Vercel Authentication**: เฉพาะผู้ใช้ Vercel ที่ล็อกอินและมีสิทธิ์ในโปรเจกต์เท่านั้นที่เปิดเว็บได้ ที่ **Settings > Deployment Protection** ให้เลือก **All Deployments** เพื่อให้โดเมน production ถูกป้องกันด้วย (Standard Protection เปิดโดเมน production ไว้เป็นสาธารณะ) เอกสารระบุว่าการป้องกัน All Deployments ด้วย Vercel Authentication ใช้ได้ทุกแพ็กเกจ
+- **Password Protection**: ผู้เข้าชมกรอกรหัสผ่านร่วม เอกสารระบุว่ามีใน Pro ($20 ต่อเดือนต่อโปรเจกต์ที่ป้องกัน) และ Enterprise และไม่มีใน Hobby
+
+ที่มา: [Deployment Protection on Vercel](https://vercel.com/docs/deployment-protection) (อ่านเมื่อ 2026-10-27) แพ็กเกจอาจเปลี่ยน ควรตรวจหน้านี้อีกครั้งก่อนตัดสินใจ
 
 ### ปุ่ม "Deploy to Vercel" (ใช้ได้เมื่อ repository เป็น public เท่านั้น)
 
-ปุ่มคลิกเดียวใช้ได้กับ repository แบบ **public** เท่านั้น เมื่อเปิดเป็น public แล้ว ให้แทน `<YOUR_REPO_URL>` (เช่น `https://github.com/<owner>/<repo>`) ใน URL แม่แบบนี้ (ค่า `repository-url` ต้องเข้ารหัส URL เช่น `https%3A%2F%2Fgithub.com%2F<owner>%2F<repo>`):
+ปุ่มคลิกเดียวใช้ได้กับ repository แบบ **public** เท่านั้น เมื่อเปิดเป็น public แล้ว ให้แทน `<YOUR_REPO_URL>` (เช่น `https://github.com/<owner>/<repo>`) ใน URL แม่แบบนี้ (ค่า `repository-url` อาจต้องเข้ารหัส URL ในบางเครื่องมือ เช่น `https%3A%2F%2Fgithub.com%2F<owner>%2F<repo>`):
 
 ```
 https://vercel.com/new/clone?repository-url=<YOUR_REPO_URL>&root-directory=apps/web&env=AI_PROVIDER,AI_MODEL,GOOGLE_GENERATIVE_AI_API_KEY

@@ -4,7 +4,9 @@ import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
 import { QuoteError, type MatchResponse, type ValidatedLine } from '@tqc/core';
 import {
+  CODE_VERSION_FILES,
   caseFingerprint,
+  computeCodeVersion,
   createCumulativePersister,
   cumulativeFileName,
   cumulativeResults,
@@ -90,6 +92,7 @@ describe('mergeCumulative', () => {
       id: 'a',
       category: 'thai',
       fingerprint: caseFingerprint(defs[0]!),
+      codeVersion: computeCodeVersion(),
       actual: [line('S1')],
       score: { correct: 1, total: 1, extra: 0 },
       fullyCorrect: true,
@@ -202,6 +205,95 @@ describe('stale results (a case edited after its result was stored)', () => {
     const merged = mergeWith(file, [good('a')], day2, edited);
     expect([...goodCaseIds(merged, edited)].sort()).toEqual(['a', 'b']);
     expect(merged.cases.a?.fingerprint).toBe(caseFingerprint(edited[0]!));
+  });
+});
+
+describe('code version (a result is only good for the code that produced it)', () => {
+  const sources = (over: Record<string, string> = {}) => {
+    const files: Record<string, string> = Object.fromEntries(CODE_VERSION_FILES.map((f) => [f, `content of ${f}`]));
+    return (path: string): string => {
+      const text = over[path] ?? files[path];
+      if (text === undefined) throw new Error(`unexpected read of ${path}`);
+      return text;
+    };
+  };
+
+  it('hashes the prompt, schema, validation, pipeline, retrieval and both sample catalogs', () => {
+    expect([...CODE_VERSION_FILES]).toEqual([
+      'packages/core/src/ai/prompts.ts',
+      'packages/core/src/ai/schemas.ts',
+      'packages/core/src/ai/validate.ts',
+      'packages/core/src/ai/pipeline.ts',
+      'packages/core/src/retrieve/index.ts',
+      'packages/core/src/retrieve/tokenize.ts',
+      'samples/catalogs/plumbing.csv',
+      'samples/catalogs/office.csv',
+    ]);
+  });
+
+  it('is 12 hex characters and stable for the same contents', () => {
+    expect(computeCodeVersion(sources())).toMatch(/^[0-9a-f]{12}$/);
+    expect(computeCodeVersion(sources())).toBe(computeCodeVersion(sources()));
+  });
+
+  it.each(CODE_VERSION_FILES.map((f) => [f]))('changes when %s changes', (file) => {
+    expect(computeCodeVersion(sources({ [file]: 'edited' }))).not.toBe(computeCodeVersion(sources()));
+  });
+
+  it('does not depend on the checkout line endings', () => {
+    const lf = sources({ 'packages/core/src/ai/prompts.ts': 'a\nb\n' });
+    const crlf = sources({ 'packages/core/src/ai/prompts.ts': 'a\r\nb\r\n' });
+    expect(computeCodeVersion(crlf)).toBe(computeCodeVersion(lf));
+  });
+
+  it('reads the real files by default', () => {
+    expect(computeCodeVersion()).toMatch(/^[0-9a-f]{12}$/);
+  });
+
+  const v1 = computeCodeVersion(sources());
+  const v2 = computeCodeVersion(sources({ 'packages/core/src/ai/prompts.ts': 'a new prompt' }));
+  const file = mergeWith(emptyCumulative('google', 'm'), [good('a'), good('b', { category: 'english' })], day1, defs, v1);
+
+  it('stamps each stored result with the code version it ran against', () => {
+    expect(file.cases.a?.codeVersion).toBe(v1);
+  });
+
+  it('counts results as good only for the same code version', () => {
+    expect([...goodCaseIds(file, defs, v1)].sort()).toEqual(['a', 'b']);
+    expect(cumulativeResults(file, defs, v1)).toHaveLength(2);
+    // the prompt changed: every stored result is stale, --resume would re-run them all
+    expect([...goodCaseIds(file, defs, v2)]).toEqual([]);
+    expect(cumulativeResults(file, defs, v2)).toEqual([]);
+  });
+
+  it('a result stored before code versions existed counts as stale', () => {
+    const legacy = JSON.parse(JSON.stringify(file)) as CumulativeFile;
+    delete (legacy.cases.a as { codeVersion?: string }).codeVersion;
+    expect([...goodCaseIds(legacy, defs, v1)]).toEqual(['b']);
+  });
+
+  it('re-running a stale case under the new code replaces it and keeps the other stale ones ignored', () => {
+    const merged = mergeWith(file, [good('a')], day2, defs, v2);
+    expect(merged.cases.a?.codeVersion).toBe(v2);
+    expect([...goodCaseIds(merged, defs, v2)]).toEqual(['a']);
+  });
+
+  it('the persister stamps results with the given code version', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'tqc-codever-'));
+    try {
+      const path = join(dir, 'm-cumulative.json');
+      const persister = createCumulativePersister({
+        path,
+        file: emptyCumulative('google', 'm'),
+        cases: defs,
+        codeVersion: v2,
+        now: () => day1,
+      });
+      persister.onCase(good('a'));
+      expect(parseCumulative(readFileSync(path, 'utf8')).cases.a?.codeVersion).toBe(v2);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });
 

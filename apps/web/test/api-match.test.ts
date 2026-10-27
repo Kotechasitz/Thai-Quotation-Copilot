@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { APICallError } from 'ai';
 import { QUOTE_ERROR_MESSAGES, QuoteError, type MatchResponse, type QuoteErrorCode } from '@tqc/core';
 
 const { runMatchMock, getModelConfigMock } = vi.hoisted(() => ({
@@ -143,6 +144,7 @@ describe('POST /api/match', () => {
       ['AI_BUSY', 503],
       ['AI_TIMEOUT', 504],
       ['AI_QUOTA_EXCEEDED', 429],
+      ['AI_CONFIG', 500],
     ];
 
     it.each(table)('maps QuoteError %s to HTTP %i with its Thai message', async (code, status) => {
@@ -181,6 +183,15 @@ describe('POST /api/match', () => {
     });
   });
 
+  describe('route config', () => {
+    it('allows the function to run 90 s, longer than the 60 s AI deadline', async () => {
+      const route = await import('../app/api/match/route');
+      const { AI_TIMEOUT_MS } = await import('@tqc/core');
+      expect(route.maxDuration).toBe(90);
+      expect(AI_TIMEOUT_MS).toBe(60_000);
+    });
+  });
+
   describe('logging', () => {
     function spyConsole() {
       return (['log', 'info', 'warn', 'error', 'debug'] as const).map((m) =>
@@ -216,6 +227,40 @@ describe('POST /api/match', () => {
       expect(logged).toContain('AI_BUSY');
       expect(logged).not.toContain(SECRET_INQUIRY);
       expect(logged).not.toContain('boom');
+    });
+
+    const providerError = (statusCode: number) =>
+      new APICallError({
+        message: `HTTP ${statusCode} ${SECRET_INQUIRY}`,
+        url: 'https://example.invalid',
+        requestBodyValues: { inquiry: SECRET_INQUIRY },
+        statusCode,
+        isRetryable: false,
+      });
+
+    it('logs errorName and the provider statusCode for an unexpected provider error, never its message', async () => {
+      const spies = spyConsole();
+      runMatchMock.mockRejectedValueOnce(providerError(400));
+      await POST(jsonRequest({ inquiry: SECRET_INQUIRY, catalog }));
+      const logged = allLogged(spies);
+      expect(logged).toContain('"errorName":"AI_APICallError"');
+      expect(logged).toContain('"statusCode":400');
+      expect(logged).not.toContain(SECRET_INQUIRY);
+      expect(logged).not.toContain('HTTP 400');
+    });
+
+    it('logs the provider statusCode behind a QuoteError cause (AI_CONFIG), without the message', async () => {
+      const spies = spyConsole();
+      runMatchMock.mockRejectedValueOnce(new QuoteError('AI_CONFIG', { cause: providerError(404) }));
+      const res = await POST(jsonRequest({ inquiry: SECRET_INQUIRY, catalog }));
+      const body = (await res.json()) as ErrorBody;
+      expect(res.status).toBe(500);
+      expect(body.error.code).toBe('AI_CONFIG');
+      const logged = allLogged(spies);
+      expect(logged).toContain('"code":"AI_CONFIG"');
+      expect(logged).toContain('"errorName":"QuoteError"');
+      expect(logged).toContain('"statusCode":404');
+      expect(logged).not.toContain(SECRET_INQUIRY);
     });
 
     it('does not log the body when it fails schema validation', async () => {

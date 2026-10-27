@@ -1,4 +1,4 @@
-import { bahtText, formatBaht, formatThaiDate, type Discount, type Quotation } from '@tqc/core';
+import { bahtText, formatBaht, formatThaiDate, summaryRows, type Discount, type Quotation } from '@tqc/core';
 
 interface QuoteDocumentProps {
   quotation: Quotation;
@@ -108,19 +108,9 @@ export function QuoteDocument({ quotation: q }: QuoteDocumentProps) {
 
       <div className="quote-doc__totals">
         <dl className="quote-doc__summary">
-          <SummaryRow label="รวมเป็นเงิน" value={formatBaht(t.subtotalSatang)} />
-          {t.billDiscountSatang > 0 && <SummaryRow label="ส่วนลดท้ายบิล" value={`-${formatBaht(t.billDiscountSatang)}`} />}
-          <SummaryRow
-            label={`ภาษีมูลค่าเพิ่ม ${String(q.vatRatePercent)}%${q.pricesIncludeVat ? ' (ราคารวม VAT แล้ว)' : ''}`}
-            value={formatBaht(t.vatSatang)}
-          />
-          <SummaryRow label="ยอดรวมทั้งสิ้น" value={formatBaht(t.grandTotalSatang)} strong />
-          {q.whtRatePercent > 0 && (
-            <>
-              <SummaryRow label={`หัก ณ ที่จ่าย ${String(q.whtRatePercent)}%`} value={formatBaht(t.whtSatang)} />
-              <SummaryRow label="ยอดชำระสุทธิ" value={formatBaht(t.netPayableSatang)} strong />
-            </>
-          )}
+          {summaryRows(q).map((row) => (
+            <SummaryRow key={row.label} label={row.label} value={row.value} strong={row.strong} />
+          ))}
         </dl>
       </div>
 

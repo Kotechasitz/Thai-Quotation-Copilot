@@ -3,6 +3,7 @@ import {
   computeQuote,
   formatBaht,
   roundHalfUpDiv,
+  type Discount,
   type QuoteInput,
 } from '../src/index.ts';
 
@@ -169,6 +170,40 @@ describe('computeQuote', () => {
     expect(b.afterDiscountSatang).toBe(0);
     const c = computeQuote(base({ lines, billDiscount: { type: 'amount', satang: -1 } }));
     expect(c.billDiscountSatang).toBe(0);
+  });
+
+  it('VAT rate 0 inclusive: base equals the price and VAT is zero', () => {
+    const t = computeQuote(
+      base({
+        lines: [{ unitPriceSatang: 10000, quantity: 1, discount: null }],
+        vatRatePercent: 0,
+        pricesIncludeVat: true,
+      }),
+    );
+    expect(t.vatBaseSatang).toBe(10000);
+    expect(t.vatSatang).toBe(0);
+    expect(t.grandTotalSatang).toBe(10000);
+  });
+
+  it('rounds an exact half satang of VAT up (50 satang at 7% = 3.5 -> 4)', () => {
+    const t = computeQuote(base({ lines: [{ unitPriceSatang: 50, quantity: 1, discount: null }] }));
+    expect(t.vatSatang).toBe(4);
+    expect(t.grandTotalSatang).toBe(54);
+  });
+
+  it('rejects non-finite or fractional discounts', () => {
+    const lineWith = (discount: Discount) =>
+      base({ lines: [{ unitPriceSatang: 10000, quantity: 1, discount }] });
+    expect(() => computeQuote(lineWith({ type: 'percent', value: Number.NaN }))).toThrow(RangeError);
+    expect(() => computeQuote(lineWith({ type: 'percent', value: Number.POSITIVE_INFINITY }))).toThrow(RangeError);
+    expect(() => computeQuote(lineWith({ type: 'amount', satang: Number.NaN }))).toThrow(RangeError);
+    expect(() => computeQuote(lineWith({ type: 'amount', satang: Number.POSITIVE_INFINITY }))).toThrow(RangeError);
+    expect(() => computeQuote(lineWith({ type: 'amount', satang: 10.5 }))).toThrow(RangeError);
+    const lines = [{ unitPriceSatang: 10000, quantity: 1, discount: null }];
+    expect(() => computeQuote(base({ lines, billDiscount: { type: 'percent', value: Number.NaN } }))).toThrow(
+      RangeError,
+    );
+    expect(() => computeQuote(base({ lines, billDiscount: { type: 'amount', satang: 0.5 } }))).toThrow(RangeError);
   });
 
   it('empty quote is all zeros', () => {

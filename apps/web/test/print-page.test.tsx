@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { act, cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import type { Catalog, Quotation } from '@tqc/core';
+import { toCsv, type Catalog, type Quotation } from '@tqc/core';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { QuoteDocument } from '@/components/print/QuoteDocument';
 import { PrintScreen } from '@/components/print/PrintScreen';
@@ -89,6 +89,73 @@ describe('PrintScreen gate', () => {
   });
 });
 
+describe('PrintScreen stays in step with the review tab', () => {
+  /** The review tab edited the draft: the approval is withdrawn in storage. */
+  function withdrawApproval() {
+    const draft = approvedDraft();
+    window.localStorage.setItem(STORAGE_KEYS.draft, JSON.stringify({ ...draft, notes: 'แก้ไขแล้ว', approvedAt: null }));
+  }
+
+  it('switches to the not-approved message when the draft changes in another tab (storage event)', () => {
+    seed(approvedDraft());
+    render(<PrintScreen />);
+    expect(screen.getByRole('article', { name: 'ใบเสนอราคา' })).toBeTruthy();
+
+    act(() => {
+      withdrawApproval();
+      window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEYS.draft }));
+    });
+    expect(screen.queryByRole('article')).toBeNull();
+    expect(screen.getByText(/ยังไม่ได้อนุมัติ/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'พิมพ์ / บันทึก PDF' })).toBeNull();
+  });
+
+  it('re-validates when the window regains focus, even if no storage event arrived', () => {
+    seed(approvedDraft());
+    render(<PrintScreen />);
+    act(() => {
+      withdrawApproval();
+      window.dispatchEvent(new Event('focus'));
+    });
+    expect(screen.queryByRole('article')).toBeNull();
+    expect(screen.getByText(/ยังไม่ได้อนุมัติ/)).toBeTruthy();
+  });
+
+  it('re-validates right before printing', () => {
+    seed(approvedDraft());
+    render(<PrintScreen />);
+    act(() => {
+      withdrawApproval();
+      window.dispatchEvent(new Event('beforeprint'));
+    });
+    expect(screen.queryByRole('article')).toBeNull();
+    expect(screen.getByText(/ยังไม่ได้อนุมัติ/)).toBeTruthy();
+  });
+
+  it('does not call window.print from the button when the approval was withdrawn without any event', async () => {
+    const print = vi.fn();
+    vi.stubGlobal('print', print);
+    seed(approvedDraft());
+    render(<PrintScreen />);
+    const button = screen.getByRole('button', { name: 'พิมพ์ / บันทึก PDF' });
+    withdrawApproval(); // no storage event, no focus: the click handler must look again itself
+    await userEvent.setup().click(button);
+    expect(print).not.toHaveBeenCalled();
+    expect(screen.getByText(/ยังไม่ได้อนุมัติ/)).toBeTruthy();
+  });
+
+  it('keeps showing the document while the approved draft is unchanged', () => {
+    seed(approvedDraft());
+    render(<PrintScreen />);
+    act(() => {
+      window.dispatchEvent(new Event('focus'));
+      window.dispatchEvent(new Event('beforeprint'));
+      window.dispatchEvent(new StorageEvent('storage', { key: STORAGE_KEYS.draft }));
+    });
+    expect(screen.getByRole('article', { name: 'ใบเสนอราคา' })).toBeTruthy();
+  });
+});
+
 describe('QuoteDocument', () => {
   const doc = () => screen.getByRole('article', { name: 'ใบเสนอราคา' });
 
@@ -156,25 +223,53 @@ describe('QuoteDocument', () => {
     render(<QuoteDocument quotation={quotationOf(approvedWith({}))} />);
     const d = within(doc());
     expect(d.getByText('รวมเป็นเงิน').nextElementSibling?.textContent).toBe('1,000.00');
+    expect(d.getByText('มูลค่าก่อนภาษีมูลค่าเพิ่ม').nextElementSibling?.textContent).toBe('1,000.00');
     expect(d.getByText('ภาษีมูลค่าเพิ่ม 7%').nextElementSibling?.textContent).toBe('70.00');
     expect(d.getByText('ยอดรวมทั้งสิ้น').nextElementSibling?.textContent).toBe('1,070.00');
     expect(d.getByText(/หนึ่งพันเจ็ดสิบบาทถ้วน/)).toBeTruthy();
     expect(d.queryByText(/ส่วนลดท้ายบิล/)).toBeNull();
     expect(d.queryByText(/หัก ณ ที่จ่าย/)).toBeNull();
     expect(d.queryByText('ยอดชำระสุทธิ')).toBeNull();
-    expect(d.queryByText(/ราคารวม VAT แล้ว/)).toBeNull();
+    expect(d.queryByText(/รวมอยู่ในราคาแล้ว/)).toBeNull();
+  });
+
+  it('lists the summary rows in the same order as the CSV export', () => {
+    const catalog = catalogOf(undefined, true);
+    const draft = approvedWith({ billDiscount: { type: 'amount', satang: 10_000 }, whtRatePercent: 3 }, catalog);
+    const q = quotationOf(draft, catalog);
+    render(<QuoteDocument quotation={q} />);
+    const labels = within(doc())
+      .getAllByRole('term')
+      .map((t) => t.textContent);
+    const csvLabels = toCsv(q)
+      .split('\r\n')
+      .filter((row) => row.startsWith(',,') && !row.startsWith(',,ตัวอักษร'))
+      .map((row) => row.split(',')[2]);
+    expect(labels).toEqual(csvLabels);
+    expect(labels).toEqual([
+      'รวมเป็นเงิน',
+      'ส่วนลดท้ายบิล',
+      'ยอดหลังหักส่วนลด',
+      'มูลค่าก่อนภาษีมูลค่าเพิ่ม',
+      'ภาษีมูลค่าเพิ่ม 7% (รวมอยู่ในราคาแล้ว)',
+      'ยอดรวมทั้งสิ้น',
+      'หัก ณ ที่จ่าย 3%',
+      'ยอดชำระสุทธิ',
+    ]);
   });
 
   it('adds the bill discount row only when there is one', () => {
     const draft = approvedWith({ billDiscount: { type: 'amount', satang: 10_000 } });
     render(<QuoteDocument quotation={quotationOf(draft)} />);
-    expect(within(doc()).getByText('ส่วนลดท้ายบิล').nextElementSibling?.textContent).toBe('-100.00');
+    const d = within(doc());
+    expect(d.getByText('ส่วนลดท้ายบิล').nextElementSibling?.textContent).toBe('-100.00');
+    expect(d.getByText('ยอดหลังหักส่วนลด').nextElementSibling?.textContent).toBe('900.00');
   });
 
   it('adds withholding tax and net payable only when WHT is above zero', () => {
     render(<QuoteDocument quotation={quotationOf(approvedWith({ whtRatePercent: 3 }))} />);
     const d = within(doc());
-    expect(d.getByText('หัก ณ ที่จ่าย 3%').nextElementSibling?.textContent).toBe('30.00');
+    expect(d.getByText('หัก ณ ที่จ่าย 3%').nextElementSibling?.textContent).toBe('-30.00');
     expect(d.getByText('ยอดชำระสุทธิ').nextElementSibling?.textContent).toBe('1,040.00');
   });
 
@@ -182,7 +277,8 @@ describe('QuoteDocument', () => {
     const catalog = catalogOf(undefined, true);
     render(<QuoteDocument quotation={quotationOf(approvedWith({}, catalog), catalog)} />);
     const d = within(doc());
-    expect(d.getByText(/ภาษีมูลค่าเพิ่ม 7%.*ราคารวม VAT แล้ว/)).toBeTruthy();
+    expect(d.getByText('ภาษีมูลค่าเพิ่ม 7% (รวมอยู่ในราคาแล้ว)').nextElementSibling?.textContent).toBe('65.42');
+    expect(d.getByText('มูลค่าก่อนภาษีมูลค่าเพิ่ม').nextElementSibling?.textContent).toBe('934.58');
     expect(d.getByText('ยอดรวมทั้งสิ้น').nextElementSibling?.textContent).toBe('1,000.00');
   });
 

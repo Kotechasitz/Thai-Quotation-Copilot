@@ -175,6 +175,36 @@ describe('validateMatches', () => {
     expect(line.alternativeSkus).toEqual(['A', 'B']);
   });
 
+  it("keeps the ambiguous answer's own valid sku, first, as an alternative", () => {
+    const line = first(
+      [item('L1')],
+      [match('L1', { status: 'ambiguous', sku: 'B', alternativeSkus: ['A', 'B'], confidence: 'medium' })],
+      cands({ L1: [lite('A'), lite('B')] }),
+    );
+    expect(line.status).toBe('ambiguous');
+    expect(line.sku).toBeNull();
+    expect(line.alternativeSkus).toEqual(['B', 'A']);
+  });
+
+  it("counts the ambiguous answer's own sku toward the two-alternative minimum", () => {
+    const line = first(
+      [item('L1')],
+      [match('L1', { status: 'ambiguous', sku: 'A', alternativeSkus: ['B'], confidence: 'medium' })],
+      cands({ L1: [lite('A'), lite('B')] }),
+    );
+    expect(line.status).toBe('ambiguous');
+    expect(line.alternativeSkus).toEqual(['A', 'B']);
+  });
+
+  it("ignores an ambiguous answer's sku that is not a candidate", () => {
+    const line = first(
+      [item('L1')],
+      [match('L1', { status: 'ambiguous', sku: 'GHOST', alternativeSkus: ['A', 'B'] })],
+      cands({ L1: [lite('A'), lite('B')] }),
+    );
+    expect(line.alternativeSkus).toEqual(['A', 'B']);
+  });
+
   it('filters alternativeSkus not in candidates for a matched line', () => {
     const line = first(
       [item('L1')],

@@ -37,6 +37,7 @@ export const ERROR_STATUS: Record<ApiErrorCode, number> = {
   AI_BUSY: 503,
   AI_TIMEOUT: 504,
   AI_QUOTA_EXCEEDED: 429,
+  AI_CONFIG: 500,
   CONFIG: 500,
   INTERNAL: 500,
 };

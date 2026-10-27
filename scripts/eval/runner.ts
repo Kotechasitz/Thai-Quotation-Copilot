@@ -1,5 +1,11 @@
 import { QuoteError, type CatalogLiteItem, type MatchResponse } from '@tqc/core';
-import { cumulativeResults, hasCurrentResult, type CumulativeFile } from './cumulative.ts';
+import {
+  countStaleResults,
+  cumulativeResults,
+  currentCodeVersion,
+  hasCurrentResult,
+  type CumulativeFile,
+} from './cumulative.ts';
 import {
   costUsd,
   scoreCase,
@@ -150,6 +156,8 @@ export interface ReportOptions {
   prices: PriceTable;
   /** "<provider>/<model>" key into the price table. */
   priceKey: string;
+  /** Version of the code being scored (see computeCodeVersion); defaults to the code on disk now. */
+  codeVersion?: string;
   /** When given, a second section is appended that is computed over the cumulative file. */
   cumulative?: { file: CumulativeFile; cases: readonly EvalCase[] };
 }
@@ -177,13 +185,16 @@ function tableLines(summary: Summary): string[] {
 export function formatCumulativeSection(
   file: CumulativeFile,
   cases: readonly EvalCase[],
-  options: Pick<ReportOptions, 'prices' | 'priceKey'>,
+  options: Pick<ReportOptions, 'prices' | 'priceKey' | 'codeVersion'>,
 ): string {
-  const results = cumulativeResults(file, cases);
+  const codeVersion = options.codeVersion ?? currentCodeVersion();
+  const results = cumulativeResults(file, cases, codeVersion);
   const summary = summarize(results);
   const lines: string[] = [];
   lines.push('ผลสะสมทุกวัน (เคสที่มีผลที่ใช้ได้ ล่าสุดของแต่ละเคส)');
   lines.push(`มีผลแล้ว ${results.length}/${cases.length} ข้อ`);
+  lines.push(`เวอร์ชันโค้ด: ${codeVersion}`);
+  lines.push(`ผลเก่าที่ไม่นับ (โค้ดหรือเคสเปลี่ยน): ${countStaleResults(file, cases, codeVersion)}`);
   lines.push('');
   lines.push(...tableLines(summary));
   lines.push('');
@@ -194,7 +205,7 @@ export function formatCumulativeSection(
   const cost = costUsd(options.prices, options.priceKey, summary.usage);
   if (cost !== null) lines.push(`ค่าใช้จ่ายสะสม: $${cost.toFixed(4)} (${options.priceKey})`);
   // Missing = no result for the *current* version of the case: an edited case's old score is stale.
-  const missing = cases.filter((c) => !hasCurrentResult(file, c)).map((c) => c.id);
+  const missing = cases.filter((c) => !hasCurrentResult(file, c, codeVersion)).map((c) => c.id);
   if (missing.length > 0) {
     lines.push('');
     lines.push(`ยังไม่ครบ ${cases.length} ข้อ — ตัวเลขนี้ยังใช้ขึ้นสไลด์ไม่ได้`);

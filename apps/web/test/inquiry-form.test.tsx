@@ -113,10 +113,30 @@ describe('InquiryForm', () => {
     expect(submitButton().disabled).toBe(true);
   });
 
-  it('caps the text at the maximum length', () => {
+  it('keeps a paste over the limit whole, flags it in red and blocks submit until it is shortened', async () => {
     withCatalog();
+    const fetchMock = stubFetch({ ok: true, data: MATCH });
     render(<InquiryForm />);
-    expect(box().maxLength).toBe(MAX_INQUIRY_CHARS);
+    const user = userEvent.setup();
+    expect(box().maxLength).toBe(-1); // no silent truncation
+
+    const over = MAX_INQUIRY_CHARS + 100;
+    box().focus();
+    await user.paste('ก'.repeat(over));
+    expect(box().value).toHaveLength(over);
+    const message = `ข้อความยาวเกิน 5,000 ตัวอักษร (${String(over)}) — ตัดให้สั้นลงก่อนส่ง`;
+    expect(screen.getByText(message).getAttribute('role')).toBe('alert');
+    expect(screen.getByText(`${String(over)}/${MAX_INQUIRY_CHARS}`).className).toContain('text-red');
+    expect(submitButton().disabled).toBe(true);
+    expect(box().getAttribute('aria-invalid')).toBe('true');
+
+    await user.keyboard('{Enter}'); // cannot be submitted from the keyboard either
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    await user.clear(box());
+    await user.paste('ก'.repeat(MAX_INQUIRY_CHARS));
+    expect(screen.queryByText(/ข้อความยาวเกิน/)).toBeNull();
+    expect(submitButton().disabled).toBe(false);
   });
 
   it('posts the text with a price-free catalog, stores the draft and opens the review page', async () => {

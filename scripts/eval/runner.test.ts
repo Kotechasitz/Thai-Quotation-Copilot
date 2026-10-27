@@ -334,6 +334,39 @@ describe('cumulative report section', () => {
   });
 });
 
+describe('cumulative section and the code version', () => {
+  const prices = { 'google/known': { inputPerM: 0, outputPerM: 0 } };
+  const defsList: EvalCase[] = [
+    { id: 'a', category: 'thai', catalog: 'plumbing', inquiry: 'qa', expected: [{ sku: 'S1', status: 'matched', quantity: 1 }] },
+    { id: 'b', category: 'thai', catalog: 'plumbing', inquiry: 'qb', expected: [{ sku: 'S2', status: 'matched', quantity: 2 }] },
+  ];
+  const ok = (id: string): CaseResult => ({
+    id,
+    category: 'thai',
+    errorCode: null,
+    errorMessage: null,
+    score: { correct: 1, total: 1, extra: 0 },
+    fullyCorrect: true,
+    ms: 1,
+    usage: { inputTokens: 1, outputTokens: 1 },
+    actual: [],
+  });
+
+  it('prints the current code version and how many stored results were ignored as stale', () => {
+    const file = mergeWith(emptyCumulative('google', 'known'), [ok('a'), ok('b')], new Date(), defsList, 'aaaaaaaaaaaa');
+    const same = formatCumulativeSection(file, defsList, { prices, priceKey: 'google/known', codeVersion: 'aaaaaaaaaaaa' });
+    expect(same).toContain('เวอร์ชันโค้ด: aaaaaaaaaaaa');
+    expect(same).toContain('มีผลแล้ว 2/2');
+    expect(same).toContain('ผลเก่าที่ไม่นับ (โค้ดหรือเคสเปลี่ยน): 0');
+
+    const changed = formatCumulativeSection(file, defsList, { prices, priceKey: 'google/known', codeVersion: 'bbbbbbbbbbbb' });
+    expect(changed).toContain('เวอร์ชันโค้ด: bbbbbbbbbbbb');
+    expect(changed).toContain('มีผลแล้ว 0/2');
+    expect(changed).toContain('ผลเก่าที่ไม่นับ (โค้ดหรือเคสเปลี่ยน): 2');
+    expect(changed).toContain('ยังไม่ครบ 2 ข้อ');
+  });
+});
+
 describe('cumulative section ignores stale results', () => {
   const prices = { 'google/known': { inputPerM: 0, outputPerM: 0 } };
   const original: EvalCase[] = [

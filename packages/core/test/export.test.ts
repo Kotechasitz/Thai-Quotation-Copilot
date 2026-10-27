@@ -134,25 +134,28 @@ describe('toCsv', () => {
   it('appends summary rows in order for a plain 7% VAT quote', () => {
     const q = quote();
     const r = rows(toCsv(q));
-    // subtotal 125000, vat 8750, grand 133750
+    // subtotal 125000, vat 8750, grand 133750; the pre-VAT base is always shown
     expect(r.slice(2)).toEqual([
-      ',,รวม,,,,,"1,250.00"',
+      ',,รวมเป็นเงิน,,,,,"1,250.00"',
+      ',,มูลค่าก่อนภาษีมูลค่าเพิ่ม,,,,,"1,250.00"',
       ',,ภาษีมูลค่าเพิ่ม 7%,,,,,87.50',
       ',,ยอดรวมทั้งสิ้น,,,,,"1,337.50"',
       `,,ตัวอักษร,,,,,${bahtText(q.totals.grandTotalSatang)}`,
     ]);
   });
 
-  it('includes the bill-discount row only when it is > 0', () => {
+  it('includes the bill-discount rows (negative, then the after-discount amount) only when it is > 0', () => {
     const withDisc = rows(toCsv(quote({ billDiscount: { type: 'amount', satang: 5000 } })));
-    expect(withDisc.some((x) => x.includes('ส่วนลดท้ายบิล'))).toBe(true);
+    expect(withDisc).toContain(',,ส่วนลดท้ายบิล,,,,,-50.00');
+    expect(withDisc).toContain(',,ยอดหลังหักส่วนลด,,,,,"1,200.00"');
     const zero = rows(toCsv(quote({ billDiscount: { type: 'amount', satang: 0 } })));
     expect(zero.some((x) => x.includes('ส่วนลดท้ายบิล'))).toBe(false);
+    expect(zero.some((x) => x.includes('ยอดหลังหักส่วนลด'))).toBe(false);
     const none = rows(toCsv(quote()));
     expect(none.some((x) => x.includes('ส่วนลดท้ายบิล'))).toBe(false);
   });
 
-  it('includes withholding rows only when whtRatePercent > 0', () => {
+  it('includes withholding rows only when whtRatePercent > 0 (WHT shown negative)', () => {
     const none = rows(toCsv(quote({ whtRatePercent: 0 })));
     expect(none.some((x) => x.includes('หัก ณ ที่จ่าย'))).toBe(false);
     expect(none.some((x) => x.includes('ยอดชำระสุทธิ'))).toBe(false);
@@ -161,18 +164,41 @@ describe('toCsv', () => {
     const r = rows(toCsv(q));
     // wht = 3% of 125000 = 3750; net payable = 133750 - 3750 = 130000
     expect(r.slice(2)).toEqual([
-      ',,รวม,,,,,"1,250.00"',
+      ',,รวมเป็นเงิน,,,,,"1,250.00"',
+      ',,มูลค่าก่อนภาษีมูลค่าเพิ่ม,,,,,"1,250.00"',
       ',,ภาษีมูลค่าเพิ่ม 7%,,,,,87.50',
       ',,ยอดรวมทั้งสิ้น,,,,,"1,337.50"',
-      ',,หัก ณ ที่จ่าย 3%,,,,,37.50',
+      ',,หัก ณ ที่จ่าย 3%,,,,,-37.50',
       ',,ยอดชำระสุทธิ,,,,,"1,300.00"',
       `,,ตัวอักษร,,,,,${bahtText(q.totals.grandTotalSatang)}`,
     ]);
   });
 
+  it('reconciles an inclusive-price quote with bill discount and withholding tax', () => {
+    // lines 10,700.00 inclusive, bill discount 100.00 -> 10,600.00 incl. VAT; base 9,906.54, VAT 693.46
+    const q = quote({
+      lines: [line({ quantity: 1, unitPriceSatang: 1_070_000 })],
+      billDiscount: { type: 'amount', satang: 10_000 },
+      pricesIncludeVat: true,
+      whtRatePercent: 3,
+    });
+    const r = rows(toCsv(q));
+    expect(r.slice(2)).toEqual([
+      ',,รวมเป็นเงิน,,,,,"10,700.00"',
+      ',,ส่วนลดท้ายบิล,,,,,-100.00',
+      ',,ยอดหลังหักส่วนลด,,,,,"10,600.00"',
+      ',,มูลค่าก่อนภาษีมูลค่าเพิ่ม,,,,,"9,906.54"',
+      ',,ภาษีมูลค่าเพิ่ม 7% (รวมอยู่ในราคาแล้ว),,,,,693.46',
+      ',,ยอดรวมทั้งสิ้น,,,,,"10,600.00"',
+      ',,หัก ณ ที่จ่าย 3%,,,,,-297.20',
+      ',,ยอดชำระสุทธิ,,,,,"10,302.80"',
+      `,,ตัวอักษร,,,,,${bahtText(1_060_000)}`,
+    ]);
+  });
+
   it('prints a fractional VAT rate as-is and still prints VAT when prices include VAT', () => {
     const r = rows(toCsv(quote({ vatRatePercent: 7.5, pricesIncludeVat: true })));
-    expect(r.some((x) => x.startsWith(',,ภาษีมูลค่าเพิ่ม 7.5%,'))).toBe(true);
+    expect(r.some((x) => x.startsWith(',,ภาษีมูลค่าเพิ่ม 7.5% (รวมอยู่ในราคาแล้ว),'))).toBe(true);
   });
 
   it('writes the baht text in the amount column', () => {
@@ -184,7 +210,7 @@ describe('toCsv', () => {
   it('reads money from q.totals, not by recomputing', () => {
     const q = quote();
     q.totals = { ...q.totals, subtotalSatang: 99900 };
-    expect(toCsv(q)).toContain(',,รวม,,,,,999.00');
+    expect(toCsv(q)).toContain(',,รวมเป็นเงิน,,,,,999.00');
   });
 });
 

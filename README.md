@@ -21,7 +21,7 @@ Prices are **never** sent to the AI and never come back from it. After the match
 - **SKUs are checked in code.** A SKU returned by the model must be in the candidate list for that line, otherwise the line becomes "unmatched".
 - **Human approval before export.** The quotation must be reviewed and approved (every quantity greater than 0) before it can be printed or exported.
 - **The server keeps nothing.** The server does not store or log customer messages or catalogs (only token counts, timing and status). Your data lives in your browser.
-- **Hard limits.** Message up to 5,000 characters, up to 50 line items, 60 second timeout, at most 10 line items per AI call.
+- **Hard limits.** Message up to 5,000 characters, up to 50 line items, 60 second AI deadline, at most 10 line items per AI call.
 
 ## Quick start
 
@@ -115,11 +115,20 @@ This is an npm-workspaces monorepo. The Next.js app is in `apps/web` and imports
    - `GOOGLE_GENERATIVE_AI_API_KEY` for `google`, or `AI_GATEWAY_API_KEY` for `gateway` (use the key; OIDC on Vercel is untested here)
 6. Deploy. The build needs no AI variables; they are only read when a quotation is generated.
 
-The matching route uses a 60 second limit (`maxDuration = 60`). With Fluid Compute (the default), Hobby allows up to 300 s and Pro up to 800 s ([Vercel duration docs](https://vercel.com/docs/functions/configuring-functions/duration), read 2026-10-27). Vercel's default Node.js version is 24.x ([Vercel docs](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions), read 2026-10-27), matching this project.
+The matching route lets the function run for up to 90 seconds (`maxDuration = 90`); the AI work inside it has its own 60 second deadline (`AI_TIMEOUT_MS`), so a slow model is answered with a clean timeout message before the platform stops the function. With Fluid Compute (the default), Hobby allows up to 300 s and Pro up to 800 s ([Vercel duration docs](https://vercel.com/docs/functions/configuring-functions/duration), read 2026-10-27). Vercel's default Node.js version is 24.x ([Vercel docs](https://vercel.com/docs/functions/runtimes/node-js/node-js-versions), read 2026-10-27), matching this project.
+
+### Protect the demo deployment
+
+`/api/match` has no login. Anyone who has the deployment URL can call it, and every call spends **your** AI quota or credits. With the Google free tier, a few stray calls (a crawler, a shared link, a script) can use up the daily quota and leave you without a working demo. Switch on Vercel Deployment Protection before sharing the URL:
+
+- **Vercel Authentication**: only signed-in Vercel users with access to the project can open the site. Under **Settings > Deployment Protection**, choose **All Deployments** so the production domain is covered too (Standard Protection leaves production domains public). The docs list protecting all deployments with Vercel Authentication as available on all plans.
+- **Password Protection**: visitors enter a shared password. The docs list it as Pro ($20 per month per protected project) or Enterprise, and not available on Hobby.
+
+Source: [Deployment Protection on Vercel](https://vercel.com/docs/deployment-protection) (read 2026-10-27). Plans change, so check that page before relying on a specific plan.
 
 ### "Deploy to Vercel" button (usable only once the repository is public)
 
-The one-click button works only for **public** repositories. After you make the repository public, replace `<YOUR_REPO_URL>` (for example `https://github.com/<owner>/<repo>`) in this clone URL template. The `repository-url` value must be URL-encoded (for example `https%3A%2F%2Fgithub.com%2F<owner>%2F<repo>`):
+The one-click button works only for **public** repositories. After you make the repository public, replace `<YOUR_REPO_URL>` (for example `https://github.com/<owner>/<repo>`) in this clone URL template. The `repository-url` value may need URL-encoding in some tools (for example `https%3A%2F%2Fgithub.com%2F<owner>%2F<repo>`):
 
 ```
 https://vercel.com/new/clone?repository-url=<YOUR_REPO_URL>&root-directory=apps/web&env=AI_PROVIDER,AI_MODEL,GOOGLE_GENERATIVE_AI_API_KEY

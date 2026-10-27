@@ -10,7 +10,9 @@
  * scripts/eval/results/<model>-cumulative.json right after the case finishes (temp file + rename, so a
  * crash loses nothing already paid for and never leaves partial JSON; an errored result never overwrites a
  * good one), and the report ends with accuracy over that cumulative file. --resume skips cases that
- * already have a good result for their current inquiry/catalog/expected there. The run stops at the first
+ * already have a good result for their current inquiry/catalog/expected AND the current code version (a hash
+ * of the prompts, schemas, validation, pipeline, retrieval and sample catalogs; a result from other code is stale
+ * and re-run, and the report says how many were ignored). The run stops at the first
  * AI_QUOTA_EXCEEDED and exits 1. The per-run file is only a log: it is written once at the end.
  * Use synthetic data only: the free tier may use prompts to improve Google products.
  */

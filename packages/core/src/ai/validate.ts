@@ -84,6 +84,8 @@ export function validateMatches(
     }
 
     if (status === 'ambiguous') {
+      // An ambiguous answer may still name its best guess in `sku`; keep it (first) as one of the options.
+      if (sku !== null && bySku.has(sku)) alts = alternatives([sku, ...alts]);
       sku = null;
       if (alts.length < 2) {
         status = 'unmatched';

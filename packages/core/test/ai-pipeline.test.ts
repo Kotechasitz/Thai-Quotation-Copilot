@@ -331,8 +331,48 @@ describe('runMatch API errors and timeouts', () => {
     expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog }))).toBe('AI_BUSY');
   });
 
-  it('rethrows non-retryable API errors (e.g. 401 bad key) untouched, after one call', async () => {
-    const boom = apiError(401, false);
+  it('maps 401, 403 and 404 (bad key / model name) to AI_CONFIG after one call, never retried', async () => {
+    for (const status of [401, 403, 404]) {
+      const model = new MockLanguageModelV4({
+        doGenerate: async () => {
+          throw apiError(status, false);
+        },
+      });
+      expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog }))).toBe('AI_CONFIG');
+      expect(model.doGenerateCalls).toHaveLength(1);
+    }
+  });
+
+  it('finds the config status on .lastError and .cause too', async () => {
+    const wrapped = new RetryError({
+      message: 'Failed after 3 attempts',
+      reason: 'maxRetriesExceeded',
+      errors: [apiError(404, false)],
+    });
+    const caused = new Error('wrapper', { cause: apiError(401, false) });
+    for (const make of [() => wrapped, () => caused]) {
+      const model = new MockLanguageModelV4({
+        doGenerate: async () => {
+          throw make();
+        },
+      });
+      expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog }))).toBe('AI_CONFIG');
+      expect(model.doGenerateCalls).toHaveLength(1);
+    }
+  });
+
+  it('keeps the provider error as the cause so the status can be logged', async () => {
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        throw apiError(401, false);
+      },
+    });
+    const e = await runMatch({ model, inquiry: 'ท่อ', catalog }).catch((x: unknown) => x);
+    expect(((e as QuoteError).cause as APICallError).statusCode).toBe(401);
+  });
+
+  it('rethrows other non-retryable API errors (e.g. 400) untouched, after one call', async () => {
+    const boom = apiError(400, false);
     const model = new MockLanguageModelV4({
       doGenerate: async () => {
         throw boom;
@@ -598,6 +638,7 @@ describe('QUOTE_ERROR_MESSAGES', () => {
       'AI_BUSY',
       'AI_TIMEOUT',
       'AI_QUOTA_EXCEEDED',
+      'AI_CONFIG',
     ];
     for (const code of codes) {
       expect(QUOTE_ERROR_MESSAGES[code]).toMatch(/[฀-๿]/);
@@ -606,6 +647,7 @@ describe('QUOTE_ERROR_MESSAGES', () => {
       expect(e.message).toBe(QUOTE_ERROR_MESSAGES[code]);
     }
     expect(QUOTE_ERROR_MESSAGES.AI_BUSY).toBe('ระบบไม่ว่าง ลองใหม่อีกสักครู่');
+    expect(QUOTE_ERROR_MESSAGES.AI_CONFIG).toBe('ตั้งค่า AI ไม่ถูกต้อง (API key หรือชื่อ model) กรุณาตรวจการตั้งค่า');
     expect(QUOTE_ERROR_MESSAGES.AI_QUOTA_EXCEEDED).toBe(
       'โควตา AI ของวันนี้หมดแล้ว กรุณาลองใหม่ภายหลัง หรือเปิด billing ของ Google AI',
     );

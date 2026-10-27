@@ -137,6 +137,15 @@ function isBusyStatus(error: unknown): boolean {
   });
 }
 
+/** 401 / 403 / 404 from the provider: a wrong or revoked API key, no access, or an unknown model name. */
+function isConfigError(error: unknown): boolean {
+  return errorChain(error).some((e) => {
+    if (!APICallError.isInstance(e)) return false;
+    const s = e.statusCode;
+    return s === 401 || s === 403 || s === 404;
+  });
+}
+
 const NETWORK_CODES = /ECONNRESET|ECONNREFUSED|ETIMEDOUT|ENOTFOUND|EAI_AGAIN|EPIPE|UND_ERR/;
 
 /** A connection-level failure: no HTTP status, and either the SDK's "cannot connect" or a socket error. */
@@ -365,8 +374,9 @@ export async function runMatch(args: RunMatchArgs): Promise<MatchResponse> {
   } catch (error) {
     if (signal?.aborted === true) throw error;
     if (timeoutSignal.aborted) throw new QuoteError('AI_TIMEOUT');
-    if (isDailyQuota(error)) throw new QuoteError('AI_QUOTA_EXCEEDED');
-    if (isBusyStatus(error)) throw new QuoteError('AI_BUSY');
+    if (isDailyQuota(error)) throw new QuoteError('AI_QUOTA_EXCEEDED', { cause: error });
+    if (isBusyStatus(error)) throw new QuoteError('AI_BUSY', { cause: error });
+    if (isConfigError(error)) throw new QuoteError('AI_CONFIG', { cause: error });
     throw error;
   } finally {
     internal.abort();

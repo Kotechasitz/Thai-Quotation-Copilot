@@ -34,10 +34,11 @@ export function InquiryForm() {
   useEffect(() => () => pending.current?.abort(), []);
 
   const catalog = storedCatalog?.catalog ?? null;
-  const canSubmit = catalog !== null && inquiry.trim() !== '' && !isLoading;
+  const isTooLong = inquiry.length > MAX_INQUIRY_CHARS;
+  const canSubmit = catalog !== null && inquiry.trim() !== '' && !isTooLong && !isLoading;
 
   const submit = async () => {
-    if (catalog === null || inquiry.trim() === '' || isLoading) return;
+    if (catalog === null || inquiry.trim() === '' || isTooLong || isLoading) return;
     const controller = new AbortController();
     pending.current = controller;
     setIsLoading(true);
@@ -97,14 +98,20 @@ export function InquiryForm() {
         id="inquiry"
         className="min-h-48"
         value={inquiry}
-        maxLength={MAX_INQUIRY_CHARS}
+        aria-invalid={isTooLong}
         placeholder="วางข้อความสั่งซื้อจากไลน์ อีเมล หรือแชทของลูกค้าที่นี่"
         onChange={(event) => setInquiry(event.target.value)}
       />
       <div className="flex items-center justify-between text-sm text-zinc-600">
-        <span>{`${inquiry.length}/${MAX_INQUIRY_CHARS}`}</span>
+        <span className={isTooLong ? 'font-medium text-red-600' : undefined}>{`${inquiry.length}/${MAX_INQUIRY_CHARS}`}</span>
         <span>catalog: {storedCatalog?.sourceName} ({storedCatalog?.rowCount} รายการ)</span>
       </div>
+
+      {isTooLong && (
+        <p role="alert" className="text-sm text-red-600">
+          {`ข้อความยาวเกิน ${MAX_INQUIRY_CHARS.toLocaleString('en-US')} ตัวอักษร (${String(inquiry.length)}) — ตัดให้สั้นลงก่อนส่ง`}
+        </p>
+      )}
 
       {error !== null && (
         <Alert variant="destructive">

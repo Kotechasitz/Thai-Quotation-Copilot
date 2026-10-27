@@ -6,7 +6,8 @@ export type QuoteErrorCode =
   | 'AI_INVALID_OUTPUT'
   | 'AI_BUSY'
   | 'AI_TIMEOUT'
-  | 'AI_QUOTA_EXCEEDED';
+  | 'AI_QUOTA_EXCEEDED'
+  | 'AI_CONFIG';
 
 /** User-facing Thai text per error code. */
 export const QUOTE_ERROR_MESSAGES: Record<QuoteErrorCode, string> = {
@@ -18,13 +19,15 @@ export const QUOTE_ERROR_MESSAGES: Record<QuoteErrorCode, string> = {
   AI_BUSY: 'ระบบไม่ว่าง ลองใหม่อีกสักครู่',
   AI_TIMEOUT: 'ระบบใช้เวลานานเกินไป กรุณาลองใหม่',
   AI_QUOTA_EXCEEDED: 'โควตา AI ของวันนี้หมดแล้ว กรุณาลองใหม่ภายหลัง หรือเปิด billing ของ Google AI',
+  AI_CONFIG: 'ตั้งค่า AI ไม่ถูกต้อง (API key หรือชื่อ model) กรุณาตรวจการตั้งค่า',
 };
 
 export class QuoteError extends Error {
   readonly code: QuoteErrorCode;
 
-  constructor(code: QuoteErrorCode) {
-    super(QUOTE_ERROR_MESSAGES[code]);
+  /** `options.cause` keeps the provider error so callers can log its status code (never its message). */
+  constructor(code: QuoteErrorCode, options?: { cause?: unknown }) {
+    super(QUOTE_ERROR_MESSAGES[code], options);
     this.name = 'QuoteError';
     this.code = code;
   }

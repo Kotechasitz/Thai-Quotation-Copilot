@@ -33,9 +33,14 @@ export interface Store {
   /** Raw JSON snapshot for useSyncExternalStore (stable string identity between changes). */
   getRaw(key: string): string | null;
   subscribe(listener: () => void): () => void;
+  /** Re-reads every tracked key from storage (keys whose last write failed keep their memory copy) and notifies. */
+  refresh(): void;
+  /** Stops listening for other tabs' changes. */
+  dispose(): void;
 }
 
 const PROBE_KEY = '__tqc_probe__';
+const TRACKED_KEYS: ReadonlySet<string> = new Set(Object.values(STORAGE_KEYS));
 
 /**
  * localStorage-backed store that degrades to memory-only. `backend` undefined = the browser's
@@ -81,6 +86,24 @@ export function createStore(backend?: Storage | null): Store {
     }
   };
 
+  // Another tab changed localStorage: our memory copy is now stale, so drop it and let readers re-read.
+  // (The `storage` event is never delivered to the tab that made the change.) Browser localStorage only.
+  const onStorageEvent = (event: StorageEvent) => {
+    if (event.storageArea !== null && event.storageArea !== storage) return;
+    if (event.key === null) {
+      memory.clear();
+      failedKeys.clear();
+    } else if (TRACKED_KEYS.has(event.key)) {
+      memory.delete(event.key);
+      failedKeys.delete(event.key);
+    } else {
+      return;
+    }
+    notify();
+  };
+  const listensToWindow = backend === undefined && storage !== null && typeof window !== 'undefined';
+  if (listensToWindow) window.addEventListener('storage', onStorageEvent);
+
   return {
     get<T>(key: string): T | null {
       const raw = getRaw(key);
@@ -123,6 +146,15 @@ export function createStore(backend?: Storage | null): Store {
       listeners.add(listener);
       return () => void listeners.delete(listener);
     },
+    refresh() {
+      for (const key of TRACKED_KEYS) {
+        if (!failedKeys.has(key)) memory.delete(key);
+      }
+      notify();
+    },
+    dispose() {
+      if (listensToWindow) window.removeEventListener('storage', onStorageEvent);
+    },
   };
 }
 
@@ -136,6 +168,7 @@ export function getDefaultStore(): Store {
 
 /** Test seam: forget the shared store so the next use re-detects localStorage. */
 export function resetDefaultStore(): void {
+  defaultStore?.dispose();
   defaultStore = null;
 }
 
