@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useEffect, useMemo } from 'react';
 import { CustomerQuestions } from '@/components/review/CustomerQuestions';
+import { ExportBar } from '@/components/review/ExportBar';
 import { QuoteDetails } from '@/components/review/QuoteDetails';
 import { ReviewTable } from '@/components/review/ReviewTable';
 import { TotalsPanel } from '@/components/review/TotalsPanel';
@@ -10,7 +11,8 @@ import { StorageWarning } from '@/components/StorageWarning';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { DEFAULT_COMPANY } from '@/lib/company';
 import { canApprove, catalogKey, isApproved, lineState, previewQuote } from '@/lib/draft';
-import { STORAGE_KEYS, useStoredState, type StoredCatalog } from '@/lib/storage';
+import { nextQuoteNumber } from '@/lib/quoteNumber';
+import { STORAGE_KEYS, getDefaultStore, useStoredState, type StoredCatalog } from '@/lib/storage';
 import { parseCompany, parseStoredCatalog } from '@/lib/stored-schemas';
 import { useDraft, useHydrated } from '@/lib/use-draft';
 
@@ -80,7 +82,12 @@ export function ReviewScreen() {
   const approved = isApproved(draft, catalog);
   const lineTotals = preview.ok ? preview.lineTotals : new Map<string, number>();
 
-  const handleApproveClick = () => dispatch({ type: 'approve', now: new Date().toISOString(), catalog });
+  const handleApproveClick = () => {
+    const now = new Date();
+    // A number is only drawn from the counter when the field is blank: re-approving keeps the existing one.
+    const number = draft.number.trim() === '' ? nextQuoteNumber(getDefaultStore(), now) : undefined;
+    dispatch({ type: 'approve', now: now.toISOString(), catalog, number });
+  };
 
   return (
     <main className="mx-auto w-full max-w-5xl flex-1 space-y-4 px-6 py-8">
@@ -99,7 +106,10 @@ export function ReviewScreen() {
           <CustomerQuestions missingInfo={draft.missingInfo} lines={draft.lines} />
           <QuoteDetails draft={draft} validityDays={company.defaultValidityDays} dispatch={dispatch} />
         </div>
-        <TotalsPanel draft={draft} catalog={catalog} preview={preview} dispatch={dispatch} />
+        <div className="space-y-4">
+          <TotalsPanel draft={draft} catalog={catalog} preview={preview} dispatch={dispatch} />
+          <ExportBar draft={draft} catalog={catalog} company={company} />
+        </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-white p-4">

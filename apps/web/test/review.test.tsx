@@ -486,6 +486,58 @@ describe('unit handling on screen', () => {
   });
 });
 
+describe('quote number on approval', () => {
+  const numberInput = () => screen.getByLabelText('เลขที่ใบเสนอราคา') as HTMLInputElement;
+  const counter = () => JSON.parse(window.localStorage.getItem(STORAGE_KEYS.counter) ?? 'null') as unknown;
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'], now: new Date('2026-10-22T05:00:00.000Z') });
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('assigns the next number from the monthly counter together with the approval', async () => {
+    seed(buildDraft([L1]));
+    render(<ReviewScreen />);
+    expect(numberInput().value).toBe('');
+    await userEvent.setup().click(approveButton());
+    expect(savedDraft().number).toBe('QT-256910-001');
+    expect(savedDraft().approvedAt).not.toBeNull();
+    expect(numberInput().value).toBe('QT-256910-001');
+    expect(counter()).toEqual({ month: '256910', seq: 1 });
+  });
+
+  it('keeps a number the user typed and does not touch the counter', async () => {
+    seed({ ...buildDraft([L1]), number: 'MY-001' });
+    render(<ReviewScreen />);
+    await userEvent.setup().click(approveButton());
+    expect(savedDraft().number).toBe('MY-001');
+    expect(counter()).toBeNull();
+  });
+
+  it('keeps the number when re-approving after an edit, without using up another one', async () => {
+    seed(buildDraft([L1]));
+    render(<ReviewScreen />);
+    const user = userEvent.setup();
+    await user.click(approveButton());
+    await user.type(numberInput(), 'A');
+    expect(savedDraft().approvedAt).toBeNull();
+    await user.click(approveButton());
+    expect(savedDraft().number).toBe('QT-256910-001A');
+    expect(counter()).toEqual({ month: '256910', seq: 1 });
+  });
+
+  it('unlocks the export buttons only once approved', async () => {
+    seed(buildDraft([L1]));
+    render(<ReviewScreen />);
+    expect((screen.getByRole('button', { name: 'ดาวน์โหลด CSV' }) as HTMLButtonElement).disabled).toBe(true);
+    await userEvent.setup().click(approveButton());
+    expect((screen.getByRole('button', { name: 'ดาวน์โหลด CSV' }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole('button', { name: 'พิมพ์ / บันทึก PDF' }) as HTMLButtonElement).disabled).toBe(false);
+  });
+});
+
 describe('approval display', () => {
   it('does not show a stale approval (approvedAt set but a line is no longer ready)', () => {
     const draft = buildDraft([L1]);

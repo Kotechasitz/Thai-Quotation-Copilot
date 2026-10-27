@@ -81,7 +81,13 @@ export type DraftAction =
       >;
     }
   | { type: 'catalogChanged'; catalog: Catalog }
-  | { type: 'approve'; now: string; catalog: Catalog };
+  | {
+      type: 'approve';
+      now: string;
+      catalog: Catalog;
+      /** Quote number assigned together with the approval; omitted to keep the number as it is. */
+      number?: string;
+    };
 
 export type LineState = 'ok' | 'needs-choice' | 'needs-sku' | 'needs-quantity' | 'needs-unit';
 
@@ -442,7 +448,9 @@ function reduce(state: Draft, action: DraftAction): Draft {
       return reconcileCatalog(state, action.catalog);
     case 'approve':
       // Approving something that is not ready is refused here too, not only by the disabled button.
-      return canApprove(state, action.catalog) ? { ...state, approvedAt: action.now } : state;
+      return canApprove(state, action.catalog)
+        ? { ...state, approvedAt: action.now, number: action.number ?? state.number }
+        : state;
   }
 }
 

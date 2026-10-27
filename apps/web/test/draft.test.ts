@@ -266,6 +266,22 @@ describe('approve and editing', () => {
     expect(approved().approvedAt).toBe('2026-10-22T10:00:00.000Z');
   });
 
+  it('sets the quote number together with the approval when one is given, otherwise leaves it alone', () => {
+    const draft = load([line({ lineId: 'L1' })]);
+    const numbered = draftReducer(draft, { type: 'approve', now: 'T', catalog: CATALOG, number: 'QT-256910-001' });
+    expect(numbered.number).toBe('QT-256910-001');
+    expect(numbered.approvedAt).toBe('T');
+    const kept = draftReducer({ ...draft, number: 'MY-1' }, { type: 'approve', now: 'T', catalog: CATALOG });
+    expect(kept.number).toBe('MY-1');
+  });
+
+  it('does not take the number when the approval itself is refused', () => {
+    const draft = load([line({ lineId: 'L1', quantity: null })]);
+    const next = draftReducer(draft, { type: 'approve', now: 'T', catalog: CATALOG, number: 'QT-256910-001' });
+    expect(next.number).toBe('');
+    expect(next.approvedAt).toBeNull();
+  });
+
   it.each<[string, DraftAction]>([
     ['selectSku', { type: 'selectSku', lineId: 'L1', sku: 'P-2', catalog: CATALOG }],
     ['setQuantity', { type: 'setQuantity', lineId: 'L1', quantity: 9 }],
