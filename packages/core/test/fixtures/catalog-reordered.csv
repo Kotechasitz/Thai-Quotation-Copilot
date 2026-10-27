@@ -1,0 +1,4 @@
+unit_price,supplier,description,sku,category,unit,name_en,aliases,name_th
+"1,250.00",บริษัท ซัพพลาย A,ท่อพีวีซีสีฟ้า ยาว 4 เมตร,PVC-001,ท่อ,เส้น,PVC Pipe Class 8.5 1/2 in,พีวีซี|ท่อฟ้า,ท่อ PVC ชั้น 8.5 4 หุน
+฿35,บริษัท ซัพพลาย B,,PVC-002,ข้อต่อ,ชิ้น,,,ข้อต่อตรง PVC 4 หุน
+ 99.5 ,บริษัท ซัพพลาย A,,ELB-001,,ชิ้น,Elbow 90 deg 1/2 in,,

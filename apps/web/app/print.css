@@ -1,0 +1,218 @@
+/*
+ * Quotation document: on-screen preview and A4 print. Imported only by the /quote/print route; every
+ * rule is scoped to .quote-print / .quote-doc, except the @page rule and the print-only hiding of the app
+ * header, which only matter while printing.
+ */
+
+.quote-print {
+  flex: 1;
+  padding: 16px;
+  background: #f4f4f5;
+  color: #000;
+  font-family: var(--font-sans);
+}
+
+.quote-print__toolbar {
+  display: flex;
+  gap: 8px;
+  max-width: 210mm;
+  margin: 0 auto 12px;
+}
+
+.quote-doc {
+  box-sizing: border-box;
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 12mm;
+  background: #fff;
+  color: #000;
+  font-size: 11pt;
+  line-height: 1.45;
+}
+
+.quote-doc p {
+  margin: 0;
+}
+
+.quote-doc__header {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  justify-content: space-between;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #000;
+}
+
+.quote-doc__logo {
+  max-width: 28mm;
+  max-height: 22mm;
+  object-fit: contain;
+}
+
+.quote-doc__company {
+  flex: 1;
+  font-size: 10pt;
+}
+
+.quote-doc__company-name {
+  font-size: 13pt;
+  font-weight: 700;
+}
+
+.quote-doc__title {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.quote-doc__title h1 {
+  margin: 0 0 4px;
+  font-size: 18pt;
+  font-weight: 700;
+}
+
+.quote-doc__customer,
+.quote-doc__block {
+  margin-top: 10px;
+}
+
+.quote-doc__label {
+  font-weight: 600;
+}
+
+.quote-doc__notes {
+  white-space: pre-wrap;
+}
+
+.quote-doc__table {
+  width: 100%;
+  margin-top: 12px;
+  border-collapse: collapse;
+  font-size: 10pt;
+}
+
+.quote-doc__table th,
+.quote-doc__table td {
+  padding: 3px 5px;
+  border: 1px solid #000;
+  text-align: left;
+  vertical-align: top;
+}
+
+.quote-doc__table th {
+  background: #e5e5e5;
+  font-weight: 600;
+}
+
+.quote-doc__table .is-number {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.quote-doc__totals {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  break-inside: avoid;
+}
+
+.quote-doc__summary {
+  width: 85mm;
+  margin: 0;
+}
+
+.quote-doc__sum-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+
+.quote-doc__sum-row dt,
+.quote-doc__sum-row dd {
+  margin: 0;
+}
+
+.quote-doc__sum-row dd {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.quote-doc__sum-row--strong {
+  border-top: 1px solid #000;
+  font-weight: 700;
+}
+
+.quote-doc__words {
+  margin-top: 6px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.quote-doc__signatures {
+  display: flex;
+  gap: 24mm;
+  justify-content: space-around;
+  margin-top: 18mm;
+  break-inside: avoid;
+}
+
+.quote-doc__signature {
+  flex: 1;
+  text-align: center;
+}
+
+.quote-doc__signature-line {
+  height: 14mm;
+  border-bottom: 1px solid #000;
+}
+
+.quote-doc__signature-title {
+  margin-top: 2px;
+  font-weight: 600;
+}
+
+@page {
+  size: A4;
+  margin: 12mm;
+}
+
+@media print {
+  /* The app's own header (site navigation) and every on-screen control. */
+  body > header,
+  .no-print {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+    font-family: var(--font-sans);
+  }
+
+  .quote-print {
+    padding: 0;
+    background: #fff;
+  }
+
+  /* The @page margin already provides the page margin. */
+  .quote-doc {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  .quote-doc__table thead {
+    display: table-header-group;
+  }
+
+  .quote-doc__table tr {
+    break-inside: avoid;
+  }
+
+  .quote-doc__table th {
+    background: #e5e5e5 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}

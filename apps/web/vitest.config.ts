@@ -1,0 +1,14 @@
+import { fileURLToPath } from 'node:url';
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  resolve: {
+    alias: { '@': fileURLToPath(new URL('./', import.meta.url)) },
+  },
+  test: {
+    include: ['test/**/*.test.{ts,tsx}'],
+    environment: 'node',
+    // jsdom needs a real origin, otherwise window.localStorage is unavailable.
+    environmentOptions: { jsdom: { url: 'http://localhost' } },
+  },
+});

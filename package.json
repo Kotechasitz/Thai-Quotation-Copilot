@@ -1,0 +1,26 @@
+{
+  "name": "thai-quotation-copilot",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present && vitest run --config vitest.config.mts",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p . --noEmit",
+    "lint": "npm run lint -w @tqc/web",
+    "search": "tsx scripts/search.ts",
+    "quote": "tsx --env-file-if-exists=.env scripts/quote.ts",
+    "eval": "tsx --env-file-if-exists=.env scripts/eval/run.ts",
+    "eval:daily": "tsx --env-file-if-exists=.env scripts/eval/run.ts --resume --max-cases 8"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.5",
+    "tsx": "^4.23.15",
+    "typescript": "~6.0.3",
+    "vitest": "^5.0.5",
+    "zod": "^4.6.7"
+  }
+}

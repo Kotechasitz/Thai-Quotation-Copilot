@@ -1,0 +1,4 @@
+{
+  "_source": "gemini-3.6-flash free tier = 0 input / 0 output per https://ai.google.dev/gemini-api/docs/pricing, checked 2026-10-27. Add other models only after checking their price.",
+  "google/gemini-3.6-flash": { "inputPerM": 0, "outputPerM": 0 }
+}
