@@ -11,3 +11,12 @@ export {
   type CatalogParseResult,
 } from './catalog/parse.ts';
 export { CATALOG_TEMPLATE_CSV } from './catalog/template.ts';
+export {
+  FULL_CATALOG_THRESHOLD,
+  MAX_CANDIDATES,
+  buildIndex,
+  searchCandidates,
+  type Candidate,
+  type CandidateQuery,
+  type CatalogIndex,
+} from './retrieve/index.ts';

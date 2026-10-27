@@ -13,7 +13,14 @@ function prepare(s: string): string {
 
 const INCH = String.raw`(?:นิ้ว|inch(?:es)?\b|in\b|"|”|“|″|′′|'')`;
 const HUN = /(\d+(?:\.\d+)?)\s*หุน/;
-const FRACTION_INCH = new RegExp(String.raw`(?:(\d+)\s+)?(\d+)\s*/\s*(\d+)\s*${INCH}`);
+// Mixed number: the whole part is at most 2 digits and must not be the tail of a decimal
+// ("8.5 1/2 in" is 8.5 then 1/2 in, not 5 1/2 in).
+const FRACTION_INCH = new RegExp(
+  String.raw`(?:(?<![\d.])(\d{1,2})\s+)?(\d+)\s*/\s*(\d+)\s*${INCH}`,
+);
+// Real pipe sizes top out around 12 in; a larger leading number is a separate quantity/spec
+// ("20 1/2 นิ้ว" is 20 of something, then 1/2 in).
+const MAX_MIXED_WHOLE = 12;
 const DECIMAL_INCH = new RegExp(String.raw`(\d+(?:\.\d+)?)\s*${INCH}`);
 const MM = /(\d+(?:\.\d+)?)\s*(?:มม\.?|mm\b)/;
 
@@ -27,9 +34,10 @@ export function extractSize(s: string): Size | null {
   const frac = FRACTION_INCH.exec(t);
   if (frac) {
     const denominator = Number(frac[3]);
+    const whole = Number(frac[1] ?? 0);
     if (denominator !== 0) {
       return {
-        value: Number(frac[1] ?? 0) + Number(frac[2]) / denominator,
+        value: (whole <= MAX_MIXED_WHOLE ? whole : 0) + Number(frac[2]) / denominator,
         unit: 'in',
       };
     }

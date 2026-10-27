@@ -48,6 +48,23 @@ describe('extractSize', () => {
     expect(extractSize('1½ นิ้ว')).toEqual({ value: 1.5, unit: 'in' });
   });
 
+  it('does not take the tail of a decimal as the whole part of a mixed fraction', () => {
+    expect(extractSize('PVC Pipe Class 8.5 1/2 in')).toEqual({ value: 0.5, unit: 'in' });
+    expect(extractSize('ท่อ PVC ชั้น 8.5 1/2 นิ้ว')).toEqual({ value: 0.5, unit: 'in' });
+    expect(extractSize('ชั้น 13.5 3/4"')).toEqual({ value: 0.75, unit: 'in' });
+  });
+
+  it('caps the whole part of a mixed fraction at 1-2 digits and <= 12', () => {
+    expect(extractSize('20 1/2 นิ้ว')).toEqual({ value: 0.5, unit: 'in' });
+    expect(extractSize('90 1/2 นิ้ว')).toEqual({ value: 0.5, unit: 'in' });
+    expect(extractSize('120 1/2 นิ้ว')).toEqual({ value: 0.5, unit: 'in' });
+    expect(extractSize('13 1/2 นิ้ว')).toEqual({ value: 0.5, unit: 'in' });
+    expect(extractSize('1 1/2 นิ้ว')).toEqual({ value: 1.5, unit: 'in' });
+    expect(extractSize('2 1/2"')).toEqual({ value: 2.5, unit: 'in' });
+    expect(extractSize('1 1/4 in')).toEqual({ value: 1.25, unit: 'in' });
+    expect(extractSize('12 1/2 นิ้ว')).toEqual({ value: 12.5, unit: 'in' });
+  });
+
   it('reads millimetres', () => {
     expect(extractSize('25 มม.')).toEqual({ value: 25, unit: 'mm' });
     expect(extractSize('25mm')).toEqual({ value: 25, unit: 'mm' });
