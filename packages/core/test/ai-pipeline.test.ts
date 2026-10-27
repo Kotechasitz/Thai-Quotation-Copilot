@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { APICallError } from 'ai';
+import { APICallError, RetryError } from 'ai';
 import { MockLanguageModelV4 } from 'ai/test';
 import { describe, expect, it } from 'vitest';
 import {
@@ -331,14 +331,15 @@ describe('runMatch API errors and timeouts', () => {
     expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog }))).toBe('AI_BUSY');
   });
 
-  it('rethrows other API errors untouched', async () => {
-    const boom = apiError(500, false);
+  it('rethrows non-retryable API errors (e.g. 401 bad key) untouched, after one call', async () => {
+    const boom = apiError(401, false);
     const model = new MockLanguageModelV4({
       doGenerate: async () => {
         throw boom;
       },
     });
     await expect(runMatch({ model, inquiry: 'ท่อ', catalog })).rejects.toBe(boom);
+    expect(model.doGenerateCalls).toHaveLength(1);
   });
 
   it('gives AI_TIMEOUT when the overall deadline passes', async () => {
@@ -372,6 +373,220 @@ describe('runMatch API errors and timeouts', () => {
   });
 });
 
+/** The body Google really returns when the per-day free-tier quota is gone. */
+const PER_DAY_BODY = JSON.stringify({
+  error: {
+    code: 429,
+    message:
+      'You exceeded your current quota. Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier_requests, limit: 20, model: gemini-3.6-flash, description: Generate content requests per day limit exceeded on Free Tier.',
+    status: 'RESOURCE_EXHAUSTED',
+    details: [
+      {
+        '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+        violations: [{ quotaId: 'GenerateRequestsPerDayPerProjectPerModel-FreeTier', quotaValue: '20' }],
+      },
+    ],
+  },
+});
+const PER_MINUTE_BODY = JSON.stringify({
+  error: {
+    code: 429,
+    message: 'You exceeded your current quota. Quota exceeded for metric: generate_content_free_tier_requests, limit: 5.',
+    status: 'RESOURCE_EXHAUSTED',
+    details: [
+      {
+        '@type': 'type.googleapis.com/google.rpc.QuotaFailure',
+        violations: [{ quotaId: 'GenerateRequestsPerMinutePerProjectPerModel-FreeTier', quotaValue: '5' }],
+      },
+    ],
+  },
+});
+
+describe('runMatch retry policy and quota errors', () => {
+  const apiErr = (statusCode: number, over: { body?: string; headers?: Record<string, string> } = {}) =>
+    new APICallError({
+      message: `HTTP ${statusCode}`,
+      url: 'https://example.invalid',
+      requestBodyValues: {},
+      statusCode,
+      isRetryable: statusCode === 429 || statusCode >= 500,
+      ...(over.body !== undefined ? { responseBody: over.body } : {}),
+      ...(over.headers !== undefined ? { responseHeaders: over.headers } : {}),
+    });
+  const failing = (make: () => unknown) =>
+    new MockLanguageModelV4({
+      doGenerate: async () => {
+        throw make();
+      },
+    });
+  function recorder() {
+    const delays: number[] = [];
+    return {
+      delays,
+      sleep: async (ms: number) => {
+        delays.push(ms);
+      },
+    };
+  }
+
+  it('maps a 503 that survives the retries to AI_BUSY after exactly 4 calls (1 + 3 retries)', async () => {
+    const model = failing(() => apiErr(503));
+    const { delays, sleep } = recorder();
+    expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { sleep } }))).toBe('AI_BUSY');
+    expect(model.doGenerateCalls).toHaveLength(4);
+    expect(delays).toEqual([1000, 2000, 4000]);
+  });
+
+  it('retries 500, 502 and 504 too, then AI_BUSY', async () => {
+    for (const status of [500, 502, 504]) {
+      const model = failing(() => apiErr(status));
+      expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { baseDelayMs: 0 } }))).toBe(
+        'AI_BUSY',
+      );
+      expect(model.doGenerateCalls).toHaveLength(4);
+    }
+  });
+
+  it('a per-day quota 429 becomes AI_QUOTA_EXCEEDED after exactly 1 call (no SDK retry, no own retry)', async () => {
+    const model = failing(() => apiErr(429, { body: PER_DAY_BODY }));
+    const { delays, sleep } = recorder();
+    expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { sleep } }))).toBe(
+      'AI_QUOTA_EXCEEDED',
+    );
+    expect(model.doGenerateCalls).toHaveLength(1);
+    expect(delays).toEqual([]);
+  });
+
+  it('finds the per-day quota text in the message, in .lastError and in .cause', async () => {
+    const asMessage = new APICallError({
+      message: 'RESOURCE_EXHAUSTED: limit exceeded, Generate content requests per day',
+      url: 'https://example.invalid',
+      requestBodyValues: {},
+      statusCode: 429,
+      isRetryable: true,
+    });
+    const wrapped = new RetryError({
+      message: 'Failed after 3 attempts',
+      reason: 'maxRetriesExceeded',
+      errors: [apiErr(429, { body: PER_DAY_BODY })],
+    });
+    const caused = new Error('wrapper', { cause: apiErr(429, { body: PER_DAY_BODY }) });
+    for (const make of [() => asMessage, () => wrapped, () => caused]) {
+      const model = failing(make);
+      expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { baseDelayMs: 0 } }))).toBe(
+        'AI_QUOTA_EXCEEDED',
+      );
+      expect(model.doGenerateCalls).toHaveLength(1);
+    }
+  });
+
+  it('a per-minute 429 (no PerDay) is still retried, then AI_BUSY after 4 calls', async () => {
+    const model = failing(() => apiErr(429, { body: PER_MINUTE_BODY }));
+    expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { baseDelayMs: 0 } }))).toBe(
+      'AI_BUSY',
+    );
+    expect(model.doGenerateCalls).toHaveLength(4);
+  });
+
+  it('a 429 without RESOURCE_EXHAUSTED is not a daily quota error even if it says "per day"', async () => {
+    const model = failing(() => apiErr(429, { body: '{"error":{"message":"slow down, 5 per day"}}' }));
+    expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { baseDelayMs: 0 } }))).toBe(
+      'AI_BUSY',
+    );
+  });
+
+  it('honours retry-after (seconds and ms) up to 10 s, otherwise uses the backoff delay', async () => {
+    const table: [Record<string, string>, number[]][] = [
+      [{ 'retry-after': '3' }, [3000, 3000, 3000]],
+      [{ 'retry-after-ms': '250' }, [250, 250, 250]],
+      [{ 'retry-after': '60' }, [10_000, 10_000, 10_000]],
+      [{}, [1000, 2000, 4000]],
+    ];
+    for (const [headers, expected] of table) {
+      const model = failing(() => apiErr(503, { headers }));
+      const { delays, sleep } = recorder();
+      await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { sleep } }));
+      expect(delays).toEqual(expected);
+    }
+  });
+
+  it('retries a network error and succeeds when a later attempt works', async () => {
+    let n = 0;
+    const model = new MockLanguageModelV4({
+      doGenerate: async (o: CallOptions) => {
+        if (!isMatchCall(o)) {
+          n += 1;
+          if (n < 3) throw new TypeError('fetch failed');
+          return reply(extraction([item(1)]), 100, 50);
+        }
+        return reply(matchedAll(o), 20, 10);
+      },
+    });
+    const res = await runMatch({ model, inquiry: 'ท่อ', catalog, retry: { baseDelayMs: 0 } });
+    expect(res.lines).toHaveLength(1);
+    expect(n).toBe(3);
+  });
+
+  it('a network error that never recovers is rethrown after 4 calls, not turned into AI_BUSY', async () => {
+    const boom = new TypeError('fetch failed');
+    const model = failing(() => boom);
+    await expect(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { baseDelayMs: 0 } })).rejects.toBe(boom);
+    expect(model.doGenerateCalls).toHaveLength(4);
+  });
+
+  it('shares one budget of 4 API calls per step across the schema retry and the transport retries', async () => {
+    // call 1: reply that fails the schema -> schema retry; calls 2..: 503 forever.
+    let n = 0;
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        n += 1;
+        if (n === 1) return rawReply('not json');
+        throw apiErr(503);
+      },
+    });
+    expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { baseDelayMs: 0 } }))).toBe(
+      'AI_BUSY',
+    );
+    expect(model.doGenerateCalls).toHaveLength(4);
+  });
+
+  it('a schema failure on the last call of the budget is AI_INVALID_OUTPUT without a 5th call', async () => {
+    let n = 0;
+    const model = new MockLanguageModelV4({
+      doGenerate: async () => {
+        n += 1;
+        if (n < 4) throw apiErr(503);
+        return rawReply('not json');
+      },
+    });
+    expect(await codeOf(runMatch({ model, inquiry: 'ท่อ', catalog, retry: { baseDelayMs: 0 } }))).toBe(
+      'AI_INVALID_OUTPUT',
+    );
+    expect(model.doGenerateCalls).toHaveLength(4);
+  });
+
+  it('a caller abort during the backoff wait is rethrown; the deadline still gives AI_TIMEOUT', async () => {
+    const model = failing(() => apiErr(503));
+    const ctl = new AbortController();
+    const p = runMatch({ model, inquiry: 'ท่อ', catalog, signal: ctl.signal, retry: { baseDelayMs: 5000 } });
+    setTimeout(() => ctl.abort(), 20);
+    const err = await p.then(
+      () => null,
+      (e: unknown) => e,
+    );
+    expect(err).not.toBeNull();
+    expect(err).not.toBeInstanceOf(QuoteError);
+    expect(model.doGenerateCalls).toHaveLength(1);
+
+    const model2 = failing(() => apiErr(503));
+    expect(
+      await codeOf(
+        runMatch({ model: model2, inquiry: 'ท่อ', catalog, timeoutMs: 30, retry: { baseDelayMs: 5000 } }),
+      ),
+    ).toBe('AI_TIMEOUT');
+  });
+});
+
 describe('QUOTE_ERROR_MESSAGES', () => {
   it('has Thai text for every code and QuoteError uses it', () => {
     const codes: QuoteErrorCode[] = [
@@ -382,6 +597,7 @@ describe('QUOTE_ERROR_MESSAGES', () => {
       'AI_INVALID_OUTPUT',
       'AI_BUSY',
       'AI_TIMEOUT',
+      'AI_QUOTA_EXCEEDED',
     ];
     for (const code of codes) {
       expect(QUOTE_ERROR_MESSAGES[code]).toMatch(/[฀-๿]/);
@@ -390,6 +606,9 @@ describe('QUOTE_ERROR_MESSAGES', () => {
       expect(e.message).toBe(QUOTE_ERROR_MESSAGES[code]);
     }
     expect(QUOTE_ERROR_MESSAGES.AI_BUSY).toBe('ระบบไม่ว่าง ลองใหม่อีกสักครู่');
+    expect(QUOTE_ERROR_MESSAGES.AI_QUOTA_EXCEEDED).toBe(
+      'โควตา AI ของวันนี้หมดแล้ว กรุณาลองใหม่ภายหลัง หรือเปิด billing ของ Google AI',
+    );
   });
 });
 

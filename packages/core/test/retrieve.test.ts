@@ -66,7 +66,7 @@ describe('tokenize', () => {
   });
 });
 
-describe('searchCandidates on plumbing.csv (<= threshold, so every sku is returned, ranked)', () => {
+describe('searchCandidates on plumbing.csv (larger than the threshold, so the top candidates are returned)', () => {
   let items: CatalogLiteItem[];
   let index: CatalogIndex;
   const rank = (c: { sku: string }[], sku: string) => c.findIndex((x) => x.sku === sku);
@@ -76,10 +76,15 @@ describe('searchCandidates on plumbing.csv (<= threshold, so every sku is return
     index = buildIndex(items);
   });
 
-  it('sample catalog is a realistic size under the full-catalog threshold', () => {
+  it('sample catalog is a realistic size, well above the full-catalog threshold', () => {
     expect(items.length).toBeGreaterThanOrEqual(100);
-    expect(items.length).toBeLessThanOrEqual(FULL_CATALOG_THRESHOLD);
+    expect(items.length).toBeGreaterThan(FULL_CATALOG_THRESHOLD);
     expect(index.size).toBe(items.length);
+  });
+
+  it('the full-catalog threshold equals the candidate cap, so the AI never gets more than 20 rows', () => {
+    expect(FULL_CATALOG_THRESHOLD).toBe(MAX_CANDIDATES);
+    expect(MAX_CANDIDATES).toBe(20);
   });
 
   it('Thai alias works: ท่อ พีวีซี + 4 หุน ranks the 1/2 in PVC pipe first', () => {
@@ -93,14 +98,14 @@ describe('searchCandidates on plumbing.csv (<= threshold, so every sku is return
   });
 
   it('1/2 in must not beat 3/4 in: 6 หุน ranks the 3/4 in pipe first', () => {
-    const c = searchCandidates(index, { productQuery: 'ท่อ พีวีซี', specs: ['6 หุน'] });
+    const c = searchCandidates(index, { productQuery: 'ท่อ พีวีซี', specs: ['6 หุน'] }, items.length);
     expect(c[0]?.sku).toBe('PVC-PIPE-06');
     expect(rank(c, 'PVC-PIPE-04')).toBeGreaterThan(0);
   });
 
   it('1/2 in is not confused with 1 1/2 in or 2 1/2 in (mixed numbers)', () => {
     for (const spec of ['4 หุน', '1/2 นิ้ว']) {
-      const c = searchCandidates(index, { productQuery: 'ท่อ พีวีซี', specs: [spec] });
+      const c = searchCandidates(index, { productQuery: 'ท่อ พีวีซี', specs: [spec] }, items.length);
       expect(c[0]?.sku).toBe('PVC-PIPE-04');
       expect(rank(c, 'PVC-PIPE-12')).toBeGreaterThan(rank(c, 'PVC-PIPE-04'));
       expect(rank(c, 'PVC-PIPE-20')).toBeGreaterThan(rank(c, 'PVC-PIPE-04'));
@@ -123,7 +128,7 @@ describe('searchCandidates on plumbing.csv (<= threshold, so every sku is return
   });
 
   it('word order does not matter: 90 องศา ข้องอ ranks the 90 degree elbow first, 45 below it', () => {
-    const c = searchCandidates(index, { productQuery: '90 องศา ข้องอ', specs: [] });
+    const c = searchCandidates(index, { productQuery: '90 องศา ข้องอ', specs: [] }, items.length);
     expect(c[0]?.sku).toMatch(/^PVC-ELB90-|^PPR-ELB90-|^GI-ELB90-/);
     const best90 = Math.min(...c.map((x, i) => (/ELB90/.test(x.sku) ? i : Infinity)));
     const best45 = Math.min(...c.map((x, i) => (/ELB45/.test(x.sku) ? i : Infinity)));
@@ -146,24 +151,32 @@ describe('searchCandidates on plumbing.csv (<= threshold, so every sku is return
     expect(c[0]?.sku).toBe('PPR-PIPE-25');
   });
 
-  it('returns every sku exactly once, sorted by score descending, when catalog <= threshold', () => {
+  it('returns exactly the top MAX_CANDIDATES (20) by default, unique skus, sorted by score descending', () => {
     const c = searchCandidates(index, { productQuery: 'ท่อ พีวีซี', specs: ['4 หุน'] });
-    expect(c).toHaveLength(items.length);
-    expect(new Set(c.map((x) => x.sku))).toEqual(new Set(items.map((x) => x.sku)));
+    expect(c).toHaveLength(MAX_CANDIDATES);
+    expect(new Set(c.map((x) => x.sku)).size).toBe(MAX_CANDIDATES);
     for (let i = 1; i < c.length; i++) {
       expect(c[i - 1]!.score).toBeGreaterThanOrEqual(c[i]!.score);
     }
   });
 
-  it('ties keep catalog order (stable): a query matching nothing returns catalog order', () => {
-    const c = searchCandidates(index, { productQuery: 'zzzqqq', specs: [] });
-    expect(c.map((x) => x.sku)).toEqual(items.map((x) => x.sku));
-    expect(c.every((x) => x.score === 0)).toBe(true);
+  it('the default top 20 agrees with a full ranking (explicit large k) on the best match', () => {
+    // The re-rank pool is 3 x k, so the tail can differ between k = 20 and k = 144; the head must not.
+    const q = { productQuery: 'ท่อ พีวีซี', specs: ['4 หุน'] };
+    const top = searchCandidates(index, q).map((x) => x.sku);
+    const all = searchCandidates(index, q, items.length).map((x) => x.sku);
+    expect(all.length).toBeGreaterThan(MAX_CANDIDATES);
+    expect(top[0]).toBe(all[0]);
+    expect(all.slice(0, 5)).toEqual(top.slice(0, 5));
   });
 
-  it('k does not truncate the full-catalog result', () => {
+  it('a query matching nothing returns no candidates (the catalog is no longer sent whole)', () => {
+    expect(searchCandidates(index, { productQuery: 'zzzqqq', specs: [] })).toEqual([]);
+  });
+
+  it('k below the default still truncates the result', () => {
     const c = searchCandidates(index, { productQuery: 'ท่อ', specs: [] }, 5);
-    expect(c).toHaveLength(items.length);
+    expect(c).toHaveLength(5);
   });
 });
 
@@ -234,6 +247,23 @@ describe('degenerate input', () => {
     const index = buildIndex([lite('X', 'ท่อ'), lite('Y', 'ข้อต่อ')]);
     const c = searchCandidates(index, { productQuery: '', specs: [] });
     expect(c.map((x) => x.sku)).toEqual(['X', 'Y']);
+  });
+
+  it('a catalog of exactly 20 rows is returned whole, in catalog order when nothing matches', () => {
+    const rows = Array.from({ length: FULL_CATALOG_THRESHOLD }, (_, i) => lite(`R${i}`, `สินค้า ${i}`));
+    const c = searchCandidates(buildIndex(rows), { productQuery: 'zzzqqq', specs: [] });
+    expect(c.map((x) => x.sku)).toEqual(rows.map((r) => r.sku));
+    expect(c.every((x) => x.score === 0)).toBe(true);
+  });
+
+  it('a catalog of 21 rows is no longer sent whole: nothing matching means nothing returned', () => {
+    const rows = Array.from({ length: FULL_CATALOG_THRESHOLD + 1 }, (_, i) => lite(`R${i}`, `สินค้า ${i}`));
+    expect(searchCandidates(buildIndex(rows), { productQuery: 'zzzqqq', specs: [] })).toEqual([]);
+  });
+
+  it('on a small catalog k does not truncate the full result', () => {
+    const rows = Array.from({ length: 10 }, (_, i) => lite(`R${i}`, `ท่อ ${i}`));
+    expect(searchCandidates(buildIndex(rows), { productQuery: 'ท่อ', specs: [] }, 3)).toHaveLength(10);
   });
 });
 

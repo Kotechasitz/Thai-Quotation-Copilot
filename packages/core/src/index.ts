@@ -63,6 +63,7 @@ export {
   runMatch,
   type MatchResponse,
   type RunMatchArgs,
+  type RetryOptions,
   type ProviderOptions,
 } from './ai/pipeline.ts';
 export { mapLimit } from './util/mapLimit.ts';

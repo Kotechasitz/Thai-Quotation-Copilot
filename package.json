@@ -13,7 +13,8 @@
     "lint": "echo \"lint: no linter configured yet (ESLint arrives with the web app)\"",
     "search": "tsx scripts/search.ts",
     "quote": "tsx --env-file-if-exists=.env scripts/quote.ts",
-    "eval": "tsx --env-file-if-exists=.env scripts/eval/run.ts"
+    "eval": "tsx --env-file-if-exists=.env scripts/eval/run.ts",
+    "eval:daily": "tsx --env-file-if-exists=.env scripts/eval/run.ts --resume --max-cases 8"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

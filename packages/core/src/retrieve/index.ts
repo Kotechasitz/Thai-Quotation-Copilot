@@ -2,10 +2,14 @@ import { extractAngle, extractSize } from '../normalize/size.ts';
 import type { CatalogLiteItem, Size } from '../types.ts';
 import { tokenize } from './tokenize.ts';
 
-/** Catalogs at or below this many rows are sent to the AI whole (ranked, never filtered). */
-export const FULL_CATALOG_THRESHOLD = 300;
 /** Default number of candidates handed to the AI per requested item. */
 export const MAX_CANDIDATES = 20;
+/**
+ * Catalogs at or below this many rows are sent to the AI whole (ranked, never filtered). Equal to
+ * MAX_CANDIDATES so a bigger catalog always yields the top 20 by score: sending a 144-row catalog for
+ * every line cost ~25k input tokens per eval case.
+ */
+export const FULL_CATALOG_THRESHOLD = MAX_CANDIDATES;
 
 const NAME_WEIGHT = 1;
 const CATEGORY_WEIGHT = 0.3;

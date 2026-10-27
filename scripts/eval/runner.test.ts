@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import { QuoteError, type MatchResponse, type ValidatedLine } from '@tqc/core';
 import { costUsd, parsePrices } from './score.ts';
+import { emptyCumulative, mergeCumulative as mergeWith, type CumulativeFile } from './cumulative.ts';
 import {
+  formatCumulativeSection,
   formatReport,
+  planCases,
   resultFileName,
   runStatus,
   runCases,
   selectCases,
   type RunMatchFn,
 } from './runner.ts';
-import type { EvalCase } from './score.ts';
+import type { CaseResult, EvalCase } from './score.ts';
 
 function matchedLine(sku: string, quantity: number | null): ValidatedLine {
   return {
@@ -172,5 +175,193 @@ describe('parsePrices', () => {
       JSON.stringify({ _source: 'note', 'google/m': { inputPerM: 0, outputPerM: 0 } }),
     );
     expect(Object.keys(table)).toEqual(['google/m']);
+  });
+});
+
+describe('selectCases with a comma-separated --only', () => {
+  it('returns the listed cases, trimmed, in case-file order', () => {
+    expect(selectCases(cases, 'c, a').map((c) => c.id)).toEqual(['a', 'c']);
+    expect(selectCases(cases, 'b,b').map((c) => c.id)).toEqual(['b']);
+  });
+
+  it('names every unknown id in the error', () => {
+    expect(() => selectCases(cases, 'a,zzz,yyy')).toThrow(/zzz.*yyy|yyy.*zzz/);
+  });
+
+  it('rejects an empty list', () => {
+    expect(() => selectCases(cases, ' , ')).toThrow();
+  });
+});
+
+describe('planCases (--resume and --max-cases)', () => {
+  it('skips cases that already have a good result when resuming', () => {
+    expect(planCases(cases, { done: new Set(['a', 'c']) }).map((c) => c.id)).toEqual(['b']);
+  });
+
+  it('runs everything when there is nothing to skip', () => {
+    expect(planCases(cases, {}).map((c) => c.id)).toEqual(['a', 'b', 'c']);
+  });
+
+  it('--max-cases keeps only the first N cases left to run (after skipping)', () => {
+    expect(planCases(cases, { done: new Set(['a']), maxCases: 1 }).map((c) => c.id)).toEqual(['b']);
+    expect(planCases(cases, { maxCases: 2 }).map((c) => c.id)).toEqual(['a', 'b']);
+    expect(planCases(cases, { maxCases: 99 })).toHaveLength(3);
+  });
+
+  it('rejects a --max-cases that is not a positive integer', () => {
+    expect(() => planCases(cases, { maxCases: 0 })).toThrow();
+    expect(() => planCases(cases, { maxCases: 1.5 })).toThrow();
+  });
+});
+
+describe('stopping on AI_QUOTA_EXCEEDED', () => {
+  const prices = { 'google/known': { inputPerM: 0, outputPerM: 0 } };
+
+  it('stops immediately: no more requests, the quota case is recorded, the run reads as aborted', async () => {
+    let calls = 0;
+    const run: RunMatchFn = async ({ inquiry }) => {
+      calls += 1;
+      if (inquiry === 'qb') throw new QuoteError('AI_QUOTA_EXCEEDED');
+      return response([matchedLine('S1', 1)]);
+    };
+    const pauses: number[] = [];
+    const results = await runCases({
+      cases,
+      catalogs,
+      run,
+      pauseMs: 10,
+      sleep: async (ms) => {
+        pauses.push(ms);
+      },
+    });
+    expect(calls).toBe(2);
+    expect(results.map((r) => r.id)).toEqual(['a', 'b']);
+    expect(results[1]?.errorCode).toBe('AI_QUOTA_EXCEEDED');
+    expect(pauses).toEqual([10]);
+    const status = runStatus(results, cases.length);
+    expect(status).toEqual({ aborted: true, ran: 2, planned: 3, notRun: 1 });
+    const text = formatReport(results, { prices, priceKey: 'google/known', plannedCases: cases.length });
+    expect(text).toContain('ยกเลิกกลางทาง');
+    expect(text).toContain('โควตา');
+  });
+
+  it('a quota error on the very last planned case still means aborted (exit 1), though nothing is left unrun', async () => {
+    const run: RunMatchFn = async () => {
+      throw new QuoteError('AI_QUOTA_EXCEEDED');
+    };
+    const results = await runCases({ cases: cases.slice(0, 1), catalogs, run, pauseMs: 0, sleep: async () => {} });
+    expect(runStatus(results, 1)).toEqual({ aborted: true, ran: 1, planned: 1, notRun: 0 });
+    const text = formatReport(results, { prices, priceKey: 'google/known', plannedCases: 1 });
+    expect(text).toContain('ยกเลิกกลางทาง');
+    expect(text).toContain('โควตา');
+  });
+
+  it('a quota error on the last of several cases is aborted too, with the earlier cases kept', async () => {
+    const run: RunMatchFn = async ({ inquiry }) => {
+      if (inquiry === 'qc') throw new QuoteError('AI_QUOTA_EXCEEDED');
+      return response([matchedLine('S1', 1)]);
+    };
+    const results = await runCases({ cases, catalogs, run, pauseMs: 0, sleep: async () => {} });
+    expect(results).toHaveLength(3);
+    expect(runStatus(results, 3).aborted).toBe(true);
+  });
+
+  it('a clean complete run is not aborted', async () => {
+    const run: RunMatchFn = async () => response([matchedLine('S1', 1)]);
+    const results = await runCases({ cases, catalogs, run, pauseMs: 0, sleep: async () => {} });
+    expect(runStatus(results, 3).aborted).toBe(false);
+  });
+});
+
+describe('cumulative report section', () => {
+  const prices = { 'google/known': { inputPerM: 0, outputPerM: 0 } };
+  const allCases: EvalCase[] = [
+    ...cases,
+    { id: 'd', category: 'thai', catalog: 'plumbing', inquiry: 'qd', expected: [{ sku: 'S4', status: 'matched', quantity: 4 }] },
+  ];
+  const day = new Date('2026-10-27T10:00:00.000Z');
+  const mergeCumulative = (file: CumulativeFile, results: readonly CaseResult[], when: Date) =>
+    mergeWith(file, results, when, allCases);
+  const result = (id: string, category: 'thai' | 'english', ok: boolean): CaseResult => ({
+    id,
+    category,
+    errorCode: null,
+    errorMessage: null,
+    score: { correct: ok ? 1 : 0, total: 1, extra: 0 },
+    fullyCorrect: ok,
+    ms: 1000,
+    usage: { inputTokens: 50, outputTokens: 10 },
+    actual: [],
+  });
+
+  it('counts good cases out of all cases, per category and overall, and says it is not complete', () => {
+    const file = mergeCumulative(
+      emptyCumulative('google', 'known'),
+      [result('a', 'thai', true), result('b', 'english', false)],
+      day,
+    );
+    const text = formatCumulativeSection(file, allCases, { prices, priceKey: 'google/known' });
+    expect(text).toContain('2/4');
+    expect(text).toContain('thai');
+    expect(text).toContain('english');
+    expect(text).toContain('รวม');
+    expect(text).toContain('ยังไม่ครบ 4 ข้อ — ตัวเลขนี้ยังใช้ขึ้นสไลด์ไม่ได้');
+    expect(text).toContain('c, d');
+  });
+
+  it('drops the warning once every case has a good result', () => {
+    const file = mergeCumulative(
+      emptyCumulative('google', 'known'),
+      [result('a', 'thai', true), result('b', 'english', true), result('c', 'english', true), result('d', 'thai', false)],
+      day,
+    );
+    const text = formatCumulativeSection(file, allCases, { prices, priceKey: 'google/known' });
+    expect(text).toContain('4/4');
+    expect(text).not.toContain('ยังไม่ครบ');
+  });
+
+  it('formatReport appends it after the per-run section when given the cumulative file', () => {
+    const file = mergeCumulative(emptyCumulative('google', 'known'), [result('a', 'thai', true)], day);
+    const text = formatReport([result('a', 'thai', true)], {
+      prices,
+      priceKey: 'google/known',
+      cumulative: { file, cases: allCases },
+    });
+    const runAt = text.indexOf('ผลการประเมิน');
+    const cumAt = text.indexOf('ยังไม่ครบ 4 ข้อ');
+    expect(runAt).toBeGreaterThanOrEqual(0);
+    expect(cumAt).toBeGreaterThan(runAt);
+  });
+});
+
+describe('cumulative section ignores stale results', () => {
+  const prices = { 'google/known': { inputPerM: 0, outputPerM: 0 } };
+  const original: EvalCase[] = [
+    { id: 'a', category: 'thai', catalog: 'plumbing', inquiry: 'qa', expected: [{ sku: 'S1', status: 'matched', quantity: 1 }] },
+    { id: 'b', category: 'thai', catalog: 'plumbing', inquiry: 'qb', expected: [{ sku: 'S2', status: 'matched', quantity: 2 }] },
+  ];
+  const ok = (id: string): CaseResult => ({
+    id,
+    category: 'thai',
+    errorCode: null,
+    errorMessage: null,
+    score: { correct: 1, total: 1, extra: 0 },
+    fullyCorrect: true,
+    ms: 1,
+    usage: { inputTokens: 1, outputTokens: 1 },
+    actual: [],
+  });
+
+  it('an edited case no longer counts and is listed as missing, so the 25/25 claim cannot rest on it', () => {
+    const file = mergeWith(emptyCumulative('google', 'known'), [ok('a'), ok('b')], new Date(), original);
+    const before = formatCumulativeSection(file, original, { prices, priceKey: 'google/known' });
+    expect(before).toContain('มีผลแล้ว 2/2');
+    expect(before).not.toContain('ยังไม่ครบ');
+
+    const edited = [original[0]!, { ...original[1]!, inquiry: 'qb edited' }];
+    const after = formatCumulativeSection(file, edited, { prices, priceKey: 'google/known' });
+    expect(after).toContain('มีผลแล้ว 1/2');
+    expect(after).toContain('ยังไม่ครบ 2 ข้อ — ตัวเลขนี้ยังใช้ขึ้นสไลด์ไม่ได้');
+    expect(after).toContain('(1): b');
   });
 });
