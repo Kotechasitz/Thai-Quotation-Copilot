@@ -123,7 +123,7 @@ export function ReviewScreen() {
               อนุมัติแล้ว
             </Button>
             <p role="status" className="text-sm text-green-800">
-              อนุมัติแล้วเมื่อ {formatApprovedAt(draft.approvedAt as string)} (แก้ไขอะไรอีกจะยกเลิกการอนุมัติ)
+              อนุมัติแล้วเมื่อ {formatApprovedAt(draft.approvedAt as string)} (เมื่อแก้ไข จะยกเลิกการอนุมัติ)
             </p>
           </>
         )}
