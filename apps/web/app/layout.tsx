@@ -3,14 +3,14 @@ import localFont from 'next/font/local';
 import './globals.css';
 import { SiteNav } from '@/components/SiteNav';
 
-// Sarabun (OFL-1.1) is self-hosted from @fontsource - nothing is fetched from Google Fonts at runtime.
-// Fontsource splits Sarabun into a Thai and a Latin file per weight, so two font instances are chained
+// Sarabun (OFL-1.1, see ./fonts/OFL.txt) is self-hosted from ./fonts - nothing is fetched from Google Fonts at runtime.
+// The files come from Fontsource, which splits Sarabun into a Thai and a Latin file per weight, so two font instances are chained
 // in CSS (Latin first, Thai as the fallback for the glyphs it lacks).
 const sarabunLatin = localFont({
   src: [
-    { path: '../../../node_modules/@fontsource/sarabun/files/sarabun-latin-400-normal.woff2', weight: '400', style: 'normal' },
-    { path: '../../../node_modules/@fontsource/sarabun/files/sarabun-latin-600-normal.woff2', weight: '600', style: 'normal' },
-    { path: '../../../node_modules/@fontsource/sarabun/files/sarabun-latin-700-normal.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/sarabun-latin-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/sarabun-latin-600-normal.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/sarabun-latin-700-normal.woff2', weight: '700', style: 'normal' },
   ],
   variable: '--font-sarabun-latin',
   display: 'swap',
@@ -18,9 +18,9 @@ const sarabunLatin = localFont({
 
 const sarabunThai = localFont({
   src: [
-    { path: '../../../node_modules/@fontsource/sarabun/files/sarabun-thai-400-normal.woff2', weight: '400', style: 'normal' },
-    { path: '../../../node_modules/@fontsource/sarabun/files/sarabun-thai-600-normal.woff2', weight: '600', style: 'normal' },
-    { path: '../../../node_modules/@fontsource/sarabun/files/sarabun-thai-700-normal.woff2', weight: '700', style: 'normal' },
+    { path: './fonts/sarabun-thai-400-normal.woff2', weight: '400', style: 'normal' },
+    { path: './fonts/sarabun-thai-600-normal.woff2', weight: '600', style: 'normal' },
+    { path: './fonts/sarabun-thai-700-normal.woff2', weight: '700', style: 'normal' },
   ],
   variable: '--font-sarabun-thai',
   display: 'swap',

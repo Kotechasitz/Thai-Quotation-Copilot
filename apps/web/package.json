@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
-    "@fontsource/sarabun": "^5.2.0",
     "@tqc/core": "^0.0.0",
     "@tqc/providers": "^0.0.0",
     "class-variance-authority": "^0.7.1",
