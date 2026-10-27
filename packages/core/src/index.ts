@@ -53,3 +53,16 @@ export {
   REJECTED_REASON,
   validateMatches,
   type MatchStatus, type ValidatedLine } from './ai/validate.ts';
+export { QuoteError, QUOTE_ERROR_MESSAGES, type QuoteErrorCode } from './ai/errors.ts';
+export {
+  MAX_INQUIRY_CHARS,
+  MAX_ITEMS,
+  MATCH_BATCH_SIZE,
+  AI_CONCURRENCY,
+  AI_TIMEOUT_MS,
+  runMatch,
+  type MatchResponse,
+  type RunMatchArgs,
+  type ProviderOptions,
+} from './ai/pipeline.ts';
+export { mapLimit } from './util/mapLimit.ts';
