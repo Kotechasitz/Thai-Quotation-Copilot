@@ -24,7 +24,7 @@ export function SiteNav() {
             <span className="block text-[11px] text-muted-foreground">ใบเสนอราคาจากแชทลูกค้า</span>
           </span>
         </Link>
-        <ul className="flex gap-1 text-sm">
+        <ul className="ml-auto flex gap-1 text-sm">
           {LINKS.map(({ href, label }) => {
             const isActive = href === '/' ? pathname === '/' : pathname.startsWith(href);
             return (
@@ -43,7 +43,7 @@ export function SiteNav() {
             );
           })}
         </ul>
-        <span className="ml-auto rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs text-amber-800">
+        <span className="rounded-full border border-amber-300 bg-amber-50 px-3 py-1 text-xs text-amber-800">
           เดโม · ข้อมูลสังเคราะห์
         </span>
       </nav>

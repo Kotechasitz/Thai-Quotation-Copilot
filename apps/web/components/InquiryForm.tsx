@@ -92,7 +92,7 @@ export function InquiryForm() {
 
   if (catalog === null) {
     return (
-      <div className="surface max-w-xl space-y-4 p-6">
+      <div className="surface mx-auto w-full max-w-xl space-y-4 p-6 text-center">
         <p className="eyebrow">เริ่มต้นใช้งาน</p>
         <p>ยังไม่มี catalog สินค้า ต้องนำเข้า catalog ก่อนจึงจะสร้างใบเสนอราคาได้</p>
         <Link href="/catalog" className={buttonVariants({ size: 'lg' })}>

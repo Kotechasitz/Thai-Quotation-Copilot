@@ -5,6 +5,7 @@ export default function Home() {
   return (
     <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 py-10 sm:px-6">
       <PageHeader
+        centered
         eyebrow="ขั้นที่ 1 จาก 3"
         title="วางข้อความลูกค้า ได้ร่างใบเสนอราคาทันที"
         description={
