@@ -30,12 +30,12 @@ export function CustomerQuestions({ missingInfo, lines }: CustomerQuestionsProps
   };
 
   return (
-    <section aria-labelledby="customer-questions-heading" className="space-y-2 rounded-lg border bg-white p-4">
+    <section aria-labelledby="customer-questions-heading" className="space-y-2 surface p-4">
       <h2 id="customer-questions-heading" className="text-base font-semibold">
         คำถามถึงลูกค้า
       </h2>
       {missingInfo.length === 0 ? (
-        <p className="text-sm text-zinc-600">ไม่มีคำถามถึงลูกค้า</p>
+        <p className="text-sm text-muted-foreground">ไม่มีคำถามถึงลูกค้า</p>
       ) : (
         <>
           <ol className="list-decimal space-y-1 pl-5 text-sm">
@@ -45,7 +45,7 @@ export function CustomerQuestions({ missingInfo, lines }: CustomerQuestionsProps
                 // Questions have no id and are never reordered, so the position is a stable key here.
                 <li key={index}>
                   {m.question}
-                  {context !== undefined && <span className="block text-xs text-zinc-500">เกี่ยวกับ: {context}</span>}
+                  {context !== undefined && <span className="block text-xs text-muted-foreground">เกี่ยวกับ: {context}</span>}
                 </li>
               );
             })}
@@ -54,12 +54,12 @@ export function CustomerQuestions({ missingInfo, lines }: CustomerQuestionsProps
             <Button type="button" variant="outline" size="sm" onClick={handleCopyClick}>
               คัดลอก
             </Button>
-            <span aria-live="polite" className="text-sm text-zinc-600">
+            <span aria-live="polite" className="text-sm text-muted-foreground">
               {copyState === 'copied' && 'คัดลอกแล้ว'}
               {copyState === 'unavailable' && CLIPBOARD_UNAVAILABLE}
             </span>
           </div>
-          <p className="text-xs text-zinc-500">ระบบไม่ส่งข้อความถึงลูกค้าให้อัตโนมัติ คัดลอกไปส่งเองได้</p>
+          <p className="text-xs text-muted-foreground">ระบบไม่ส่งข้อความถึงลูกค้าให้อัตโนมัติ คัดลอกไปส่งเองได้</p>
         </>
       )}
     </section>

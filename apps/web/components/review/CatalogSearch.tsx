@@ -48,7 +48,7 @@ export function CatalogSearch({ label, searchIndex, bySku, initialQuery, suggest
         onChange={(event) => setQuery(event.target.value)}
       />
       {skus.length > 0 ? (
-        <ul className="divide-y rounded-lg border bg-white text-sm">
+        <ul className="divide-y surface text-sm">
           {skus.map((sku) => {
             const item = bySku.get(sku);
             if (item === undefined) return null;
@@ -57,7 +57,7 @@ export function CatalogSearch({ label, searchIndex, bySku, initialQuery, suggest
                 <button
                   type="button"
                   aria-label={`เลือก ${sku} ${item.nameTh ?? item.nameEn ?? sku} ${formatBaht(item.unitPriceSatang)} บาท / ${item.unit}${sku === suggested ? ' (แนะนำ)' : ''}`}
-                  className="flex w-full items-baseline gap-2 px-2.5 py-1.5 text-left hover:bg-zinc-50 focus-visible:bg-zinc-100 focus-visible:outline-none"
+                  className="flex w-full items-baseline gap-2 px-2.5 py-1.5 text-left hover:bg-muted focus-visible:bg-muted focus-visible:outline-none"
                   onClick={() => onSelect(sku)}
                 >
                   {sku === suggested && (
@@ -65,9 +65,9 @@ export function CatalogSearch({ label, searchIndex, bySku, initialQuery, suggest
                       แนะนำ
                     </span>
                   )}
-                  <span className="shrink-0 font-mono text-xs text-zinc-600">{sku}</span>
+                  <span className="shrink-0 font-mono text-xs text-muted-foreground">{sku}</span>
                   <span className="min-w-0 flex-1 truncate">{item.nameTh ?? item.nameEn ?? sku}</span>
-                  <span className="shrink-0 text-xs text-zinc-600">
+                  <span className="shrink-0 text-xs text-muted-foreground">
                     {formatBaht(item.unitPriceSatang)} / {item.unit}
                   </span>
                 </button>
@@ -76,7 +76,7 @@ export function CatalogSearch({ label, searchIndex, bySku, initialQuery, suggest
           })}
         </ul>
       ) : (
-        query.trim() !== '' && <p className="text-sm text-zinc-600">ไม่พบสินค้าที่ตรงกับคำค้น</p>
+        query.trim() !== '' && <p className="text-sm text-muted-foreground">ไม่พบสินค้าที่ตรงกับคำค้น</p>
       )}
     </div>
   );

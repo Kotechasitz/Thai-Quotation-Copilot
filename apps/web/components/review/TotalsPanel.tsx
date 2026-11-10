@@ -27,9 +27,9 @@ function parseVatRate(text: string): ParseResult<number | null> {
 
 function Row({ label, testId, value, strong = false }: { label: string; testId: string; value: string; strong?: boolean }) {
   return (
-    <div className={strong ? 'flex justify-between gap-4 text-base font-semibold' : 'flex justify-between gap-4 text-sm'}>
+    <div className={strong ? 'flex justify-between gap-4 border-t border-dashed pt-2 text-base font-semibold' : 'flex justify-between gap-4 text-sm'}>
       <dt>{label}</dt>
-      <dd data-testid={testId} className="tabular-nums">
+      <dd data-testid={testId} className="font-mono tabular-nums">
         {value}
       </dd>
     </div>
@@ -38,10 +38,10 @@ function Row({ label, testId, value, strong = false }: { label: string; testId: 
 
 export function TotalsPanel({ draft, catalog, preview, dispatch }: TotalsPanelProps) {
   return (
-    <section aria-label="สรุปยอด" className="space-y-3 rounded-lg border bg-white p-4">
-      <h2 className="text-base font-semibold">สรุปยอด</h2>
+    <section aria-label="สรุปยอด" className="surface space-y-4 p-5">
+      <h2 className="eyebrow">สรุปยอด</h2>
 
-      <div className="grid gap-3 sm:grid-cols-3">
+      <div className="grid gap-3">
         <div className="space-y-1">
           <p className="text-sm font-medium">ส่วนลดท้ายบิล</p>
           <DiscountInput
@@ -109,7 +109,7 @@ export function TotalsPanel({ draft, catalog, preview, dispatch }: TotalsPanelPr
             <Row label="ยอดชำระสุทธิ" testId="net-payable" value={baht(preview.totals.netPayableSatang)} strong />
           </dl>
           {catalog.pricesIncludeVat && (
-            <p className="text-xs text-zinc-600">
+            <p className="text-xs text-muted-foreground">
               ราคารวม VAT แล้ว (ราคาใน catalog รวมภาษีมูลค่าเพิ่ม ฐานภาษี {baht(preview.totals.vatBaseSatang)})
             </p>
           )}

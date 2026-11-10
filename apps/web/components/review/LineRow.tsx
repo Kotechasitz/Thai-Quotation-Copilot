@@ -13,19 +13,19 @@ import { cn } from '@/lib/utils';
 
 /** Colour is never the only signal: every state also has a text label. */
 const STATE_STYLE: Record<LineState, { label: string; badge: string }> = {
-  ok: { label: 'พร้อมใช้', badge: 'bg-green-100 text-green-800' },
-  'needs-choice': { label: 'ต้องเลือกสินค้า', badge: 'bg-yellow-100 text-yellow-900' },
-  'needs-sku': { label: 'ต้องค้นหาสินค้า', badge: 'bg-red-100 text-red-800' },
-  'needs-quantity': { label: 'ต้องกรอกจำนวน', badge: 'bg-zinc-200 text-zinc-800' },
-  'needs-unit': { label: 'ต้องยืนยันหน่วย', badge: 'bg-zinc-200 text-zinc-800' },
+  ok: { label: 'พร้อมใช้', badge: 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200' },
+  'needs-choice': { label: 'ต้องเลือกสินค้า', badge: 'bg-amber-50 text-amber-800 ring-1 ring-amber-200' },
+  'needs-sku': { label: 'ต้องค้นหาสินค้า', badge: 'bg-rose-50 text-rose-700 ring-1 ring-rose-200' },
+  'needs-quantity': { label: 'ต้องกรอกจำนวน', badge: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200' },
+  'needs-unit': { label: 'ต้องยืนยันหน่วย', badge: 'bg-slate-100 text-slate-700 ring-1 ring-slate-200' },
 };
 
 const BORDER: Record<LineState, string> = {
-  ok: 'border-l-green-500',
-  'needs-choice': 'border-l-yellow-400',
-  'needs-sku': 'border-l-red-500',
-  'needs-quantity': 'border-l-zinc-400',
-  'needs-unit': 'border-l-zinc-400',
+  ok: 'border-l-emerald-500',
+  'needs-choice': 'border-l-amber-400',
+  'needs-sku': 'border-l-rose-500',
+  'needs-quantity': 'border-l-slate-400',
+  'needs-unit': 'border-l-slate-400',
 };
 
 interface LineRowProps {
@@ -59,14 +59,14 @@ export function LineRow({ line, position, catalog, bySku, searchIndex, lineTotal
   const showSearch = item === undefined || isChanging;
 
   return (
-    <li aria-label={where} className={cn('grid gap-3 rounded-lg border border-l-4 bg-white p-3 md:grid-cols-[1fr_1.4fr]', BORDER[state])}>
+    <li aria-label={where} className={cn('grid gap-4 rounded-xl border border-l-4 bg-card p-4 shadow-sm md:grid-cols-[1fr_1.4fr]', BORDER[state])}>
       <div className="space-y-1">
-        <p className="text-xs text-zinc-500">
+        <p className="text-xs text-muted-foreground">
           {where} · ข้อความลูกค้า
         </p>
         <p className="whitespace-pre-wrap break-words text-sm font-medium">{line.rawText}</p>
         <p>
-          <span className={cn('inline-block rounded px-2 py-0.5 text-xs font-medium', style.badge)}>{style.label}</span>
+          <span className={cn('inline-block rounded-full px-2.5 py-0.5 text-xs font-medium', style.badge)}>{style.label}</span>
         </p>
       </div>
 
@@ -75,7 +75,7 @@ export function LineRow({ line, position, catalog, bySku, searchIndex, lineTotal
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <div>
               <p className="text-sm font-medium">{item.nameTh ?? item.nameEn ?? item.sku}</p>
-              <p className="text-xs text-zinc-600">
+              <p className="text-xs text-muted-foreground">
                 <span className="font-mono">{item.sku}</span> · {formatBaht(item.unitPriceSatang)} บาท / {item.unit}
               </p>
             </div>
@@ -84,7 +84,7 @@ export function LineRow({ line, position, catalog, bySku, searchIndex, lineTotal
             </Button>
           </div>
         )}
-        {line.reason !== '' && <p className="text-xs text-zinc-600">{line.reason}</p>}
+        {line.reason !== '' && <p className="text-xs text-muted-foreground">{line.reason}</p>}
 
         {showDropdown && (
           <NativeSelect
@@ -117,20 +117,24 @@ export function LineRow({ line, position, catalog, bySku, searchIndex, lineTotal
           />
         )}
 
-        <div className="flex flex-wrap items-start gap-3">
-          <div className="w-28">
+        <div className="flex flex-wrap items-end gap-3 rounded-lg bg-muted/60 p-3">
+          <div className="w-32 space-y-1">
+            <p aria-hidden="true" className="text-xs text-muted-foreground">
+              จำนวน
+            </p>
             <DecimalInput
               label={`จำนวน ${where}`}
               value={line.quantity}
               format={formatQuantity}
               parse={parseQuantity}
               onCommit={(quantity) => dispatch({ type: 'setQuantity', lineId: line.lineId, quantity })}
+              suffix={<span data-testid="unit-label">{line.unit ?? ''}</span>}
             />
           </div>
-          <span data-testid="unit-label" className="pt-1.5 text-sm">
-            {line.unit ?? ''}
-          </span>
-          <div className="w-44">
+          <div className="w-56 space-y-1">
+            <p aria-hidden="true" className="text-xs text-muted-foreground">
+              ส่วนลด
+            </p>
             <DiscountInput
               label={`ส่วนลด ${where}`}
               typeLabel={`ประเภทส่วนลด ${where}`}
@@ -138,14 +142,17 @@ export function LineRow({ line, position, catalog, bySku, searchIndex, lineTotal
               onChange={(discount) => dispatch({ type: 'setDiscount', lineId: line.lineId, discount })}
             />
           </div>
-          <p className="ml-auto pt-1.5 text-sm font-semibold tabular-nums">
-            {lineTotalSatang === null ? '-' : `${formatBaht(lineTotalSatang)} บาท`}
-          </p>
+          <div className="ml-auto text-right">
+            <p className="text-xs text-muted-foreground">รวม</p>
+            <p className="font-mono text-base font-semibold tabular-nums">
+              {lineTotalSatang === null ? '-' : `${formatBaht(lineTotalSatang)} บาท`}
+            </p>
+          </div>
         </div>
 
-        {line.unitNote !== null && <p className="text-xs text-zinc-600">{line.unitNote}</p>}
+        {line.unitNote !== null && <p className="text-xs text-muted-foreground">{line.unitNote}</p>}
         {state === 'needs-unit' && (
-          <div className="flex flex-wrap items-center gap-2 rounded bg-zinc-100 px-2 py-1.5 text-sm">
+          <div className="flex flex-wrap items-center gap-2 rounded-lg bg-muted px-3 py-2 text-sm">
             <span>
               ยืนยันว่าจะเสนอราคาเป็น {line.quantity} {item?.unit ?? '-'} (ไม่แปลงจาก {line.quantity} {line.unit ?? '-'})
             </span>

@@ -137,7 +137,7 @@ export function CompanyForm() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-5" noValidate>
+    <form onSubmit={handleSubmit} className="surface space-y-5 p-5 sm:p-6" noValidate>
       <StorageWarning persistent={persistent} />
 
       <div className="space-y-1.5">

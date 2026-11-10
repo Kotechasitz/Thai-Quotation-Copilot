@@ -20,7 +20,7 @@ export function ReviewTable({ draft, catalog, lineTotals, dispatch }: ReviewTabl
   const bySku = skuMap(catalog);
 
   if (draft.lines.length === 0) {
-    return <p className="rounded-lg border bg-white p-4 text-sm text-zinc-600">ไม่มีบรรทัดสินค้าในร่างนี้ กลับไปหน้าแรกเพื่อสร้างร่างใหม่</p>;
+    return <p className="surface p-4 text-sm text-muted-foreground">ไม่มีบรรทัดสินค้าในร่างนี้ กลับไปหน้าแรกเพื่อสร้างร่างใหม่</p>;
   }
 
   return (

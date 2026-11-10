@@ -29,7 +29,7 @@ export function QuoteDetails({ draft, validityDays, dispatch }: QuoteDetailsProp
     dispatch({ type: 'setBill', patch: { customer: { ...draft.customer, [field]: orNull(text) } } });
 
   return (
-    <section aria-labelledby="quote-details-heading" className="space-y-3 rounded-lg border bg-white p-4">
+    <section aria-labelledby="quote-details-heading" className="space-y-3 surface p-4">
       <h2 id="quote-details-heading" className="text-base font-semibold">
         ข้อมูลลูกค้าและเอกสาร
       </h2>

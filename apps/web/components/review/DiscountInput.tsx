@@ -39,14 +39,14 @@ export function DiscountInput({ label, typeLabel, value, onChange }: DiscountInp
     <div className="flex items-start gap-1.5">
       <NativeSelect
         aria-label={typeLabel}
-        className="w-28 shrink-0"
+        className="w-20 shrink-0"
         value={type}
         onChange={(event) => {
           setType(event.target.value as DiscountType);
           onChange(null);
         }}
       >
-        <option value="percent">เปอร์เซ็นต์ (%)</option>
+        <option value="percent">%</option>
         <option value="amount">บาท</option>
       </NativeSelect>
       <DecimalInput

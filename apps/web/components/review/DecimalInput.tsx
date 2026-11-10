@@ -1,6 +1,6 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { Input } from '@/components/ui/input';
 import type { ParseResult } from '@/lib/draft-input';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,8 @@ interface DecimalInputProps {
   /** Called only with values `parse` accepted. */
   onCommit: (value: number | null) => void;
   className?: string;
+  /** Shown inside the field on the right, e.g. the unit. */
+  suffix?: ReactNode;
 }
 
 /**
@@ -22,7 +24,7 @@ interface DecimalInputProps {
  * Thai message and is never committed, and on blur the field goes back to the last committed value,
  * so what is on screen always matches what is saved (and what gets approved).
  */
-export function DecimalInput({ label, value, format, parse, onCommit, className }: DecimalInputProps) {
+export function DecimalInput({ label, value, format, parse, onCommit, className, suffix }: DecimalInputProps) {
   const errorId = useId();
   const [text, setText] = useState(() => (value === null ? '' : format(value)));
   const [lastValue, setLastValue] = useState(value);
@@ -58,16 +60,24 @@ export function DecimalInput({ label, value, format, parse, onCommit, className 
 
   return (
     <div className={cn('space-y-1', className)}>
-      <Input
-        type="text"
-        inputMode="decimal"
-        aria-label={label}
-        aria-invalid={error !== null}
-        aria-describedby={error !== null ? errorId : undefined}
-        value={text}
-        onChange={(event) => handleChange(event.target.value)}
-        onBlur={handleBlur}
-      />
+      <div className="relative">
+        <Input
+          type="text"
+          inputMode="decimal"
+          className={cn('bg-card font-mono tabular-nums', suffix !== undefined && 'pr-14')}
+          aria-label={label}
+          aria-invalid={error !== null}
+          aria-describedby={error !== null ? errorId : undefined}
+          value={text}
+          onChange={(event) => handleChange(event.target.value)}
+          onBlur={handleBlur}
+        />
+        {suffix !== undefined && (
+          <span className="pointer-events-none absolute inset-y-0 right-0 flex max-w-14 items-center truncate pr-2.5 text-sm text-muted-foreground">
+            {suffix}
+          </span>
+        )}
+      </div>
       {error !== null && (
         <p id={errorId} role="alert" className="text-xs text-destructive">
           {error}

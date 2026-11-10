@@ -7,6 +7,7 @@ import { ExportBar } from '@/components/review/ExportBar';
 import { QuoteDetails } from '@/components/review/QuoteDetails';
 import { ReviewTable } from '@/components/review/ReviewTable';
 import { TotalsPanel } from '@/components/review/TotalsPanel';
+import { PageHeader } from '@/components/PageHeader';
 import { StorageWarning } from '@/components/StorageWarning';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { DEFAULT_COMPANY } from '@/lib/company';
@@ -27,8 +28,8 @@ function formatApprovedAt(iso: string): string {
 
 function EmptyState({ message, href, linkLabel }: { message: string; href: string; linkLabel: string }) {
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-6 py-8">
-      <p className="text-zinc-700">{message}</p>
+    <main className="mx-auto flex w-full max-w-6xl flex-1 flex-col gap-4 px-4 py-10 sm:px-6">
+      <p className="text-muted-foreground">{message}</p>
       <p>
         <Link href={href} className={buttonVariants({ variant: 'outline' })}>
           {linkLabel}
@@ -61,7 +62,7 @@ export function ReviewScreen() {
   );
 
   if (!isHydrated) {
-    return <main className="mx-auto w-full max-w-3xl flex-1 px-6 py-8 text-zinc-600">กำลังโหลด...</main>;
+    return <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 text-muted-foreground sm:px-6">กำลังโหลด...</main>;
   }
   if (draft === null) {
     return <EmptyState message="ยังไม่มีร่างใบเสนอราคา วางข้อความจากลูกค้าที่หน้าแรกเพื่อเริ่มสร้างร่าง" href="/" linkLabel="กลับไปหน้าแรก" />;
@@ -89,53 +90,73 @@ export function ReviewScreen() {
     dispatch({ type: 'approve', now: now.toISOString(), catalog, number });
   };
 
+  const readyCount = draft.lines.length - notReady;
+
+  const approvalBox = (
+    <div className="surface flex flex-wrap items-center gap-3 p-4">
+      {!approved ? (
+        <Button type="button" size="lg" className="h-10 w-full font-semibold" disabled={!isApprovable} onClick={handleApproveClick}>
+          อนุมัติ
+        </Button>
+      ) : (
+        <>
+          <Button type="button" variant="outline" disabled>
+            อนุมัติแล้ว
+          </Button>
+          <p role="status" className="text-sm text-green-800">
+            อนุมัติแล้วเมื่อ {formatApprovedAt(draft.approvedAt as string)} (เมื่อแก้ไข จะยกเลิกการอนุมัติ)
+          </p>
+        </>
+      )}
+      {!approved && !isApprovable && (
+        <p className="text-sm text-muted-foreground">
+          {notReady > 0
+            ? `ยังมี ${notReady} บรรทัดที่ต้องแก้ก่อนอนุมัติ`
+            : draft.lines.length === 0
+              ? 'ต้องมีสินค้าอย่างน้อย 1 บรรทัดจึงจะอนุมัติได้'
+              : 'ตรวจสอบจำนวนและส่วนลดอีกครั้งก่อนอนุมัติ'}
+        </p>
+      )}
+    </div>
+  );
+
   return (
-    <main className="mx-auto w-full max-w-5xl flex-1 space-y-4 px-6 py-8">
-      <h1 className="text-2xl font-bold">ตรวจแก้ร่างใบเสนอราคา</h1>
+    <main className="mx-auto w-full max-w-6xl flex-1 space-y-6 px-4 py-10 sm:px-6">
+      <PageHeader
+        eyebrow="ขั้นที่ 2 จาก 3"
+        title="ตรวจแก้ร่างใบเสนอราคา"
+        description={draft.number.trim() === '' ? undefined : <p className="font-mono text-sm">{draft.number}</p>}
+        aside={
+          <div className="flex flex-wrap gap-2 text-sm">
+            <span className="rounded-full bg-emerald-50 px-3 py-1 text-emerald-700 ring-1 ring-emerald-200">
+              พร้อมใช้ {readyCount}
+            </span>
+            {notReady > 0 && (
+              <span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800 ring-1 ring-amber-200">
+                ต้องแก้ {notReady}
+              </span>
+            )}
+          </div>
+        }
+      />
       <StorageWarning persistent={persistent} writeFailed={writeFailed} writeFailedMessage={DRAFT_NOT_SAVED} />
 
-      <details className="rounded-lg border bg-white p-3 text-sm">
-        <summary className="cursor-pointer font-medium">ข้อความต้นฉบับจากลูกค้า</summary>
-        <p className="mt-2 whitespace-pre-wrap text-zinc-700">{draft.inquiry}</p>
-      </details>
-
-      <ReviewTable draft={draft} catalog={catalog} lineTotals={lineTotals} dispatch={dispatch} />
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <div className="space-y-4">
+      <div className="grid items-start gap-6 lg:grid-cols-[1fr_360px]">
+        <div className="min-w-0 space-y-4">
+          <details className="surface px-4 py-3 text-sm">
+            <summary className="cursor-pointer font-medium">ข้อความต้นฉบับจากลูกค้า</summary>
+            <p className="mt-2 whitespace-pre-wrap text-muted-foreground">{draft.inquiry}</p>
+          </details>
+          <ReviewTable draft={draft} catalog={catalog} lineTotals={lineTotals} dispatch={dispatch} />
           <CustomerQuestions missingInfo={draft.missingInfo} lines={draft.lines} />
           <QuoteDetails draft={draft} validityDays={company.defaultValidityDays} dispatch={dispatch} />
         </div>
-        <div className="space-y-4">
-          <TotalsPanel draft={draft} catalog={catalog} preview={preview} dispatch={dispatch} />
-          <ExportBar draft={draft} catalog={catalog} company={company} />
-        </div>
-      </div>
 
-      <div className="flex flex-wrap items-center gap-3 rounded-lg border bg-white p-4">
-        {!approved ? (
-          <Button type="button" disabled={!isApprovable} onClick={handleApproveClick}>
-            อนุมัติ
-          </Button>
-        ) : (
-          <>
-            <Button type="button" variant="outline" disabled>
-              อนุมัติแล้ว
-            </Button>
-            <p role="status" className="text-sm text-green-800">
-              อนุมัติแล้วเมื่อ {formatApprovedAt(draft.approvedAt as string)} (เมื่อแก้ไข จะยกเลิกการอนุมัติ)
-            </p>
-          </>
-        )}
-        {!approved && !isApprovable && (
-          <p className="text-sm text-zinc-600">
-            {notReady > 0
-              ? `ยังมี ${notReady} บรรทัดที่ต้องแก้ก่อนอนุมัติ`
-              : draft.lines.length === 0
-                ? 'ต้องมีสินค้าอย่างน้อย 1 บรรทัดจึงจะอนุมัติได้'
-                : 'ตรวจสอบจำนวนและส่วนลดอีกครั้งก่อนอนุมัติ'}
-          </p>
-        )}
+        <aside className="space-y-4 lg:sticky lg:top-20">
+          <TotalsPanel draft={draft} catalog={catalog} preview={preview} dispatch={dispatch} />
+          {approvalBox}
+          <ExportBar draft={draft} catalog={catalog} company={company} />
+        </aside>
       </div>
     </main>
   );

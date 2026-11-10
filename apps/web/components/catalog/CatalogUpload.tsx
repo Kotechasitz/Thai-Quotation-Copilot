@@ -116,19 +116,19 @@ export function CatalogUpload() {
       {stored && (
         <section
           data-testid="stored-catalog"
-          className="rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm"
+          className="rounded-xl border border-emerald-200 bg-emerald-50 p-5 text-sm"
         >
           <h2 className="font-semibold">catalog ที่ใช้อยู่ตอนนี้</h2>
           <p>
             {`${stored.sourceName} · ${stored.rowCount} รายการ · บันทึกเมื่อ ${formatSavedAt(stored.savedAt)}`}
           </p>
-          <p className="text-zinc-600">
+          <p className="text-muted-foreground">
             {stored.catalog.pricesIncludeVat ? 'ราคารวม VAT แล้ว' : 'ราคายังไม่รวม VAT'}
           </p>
         </section>
       )}
 
-      <section className="space-y-3">
+      <section className="surface space-y-4 p-5 sm:p-6">
         <h2 className="text-lg font-semibold">นำเข้า catalog</h2>
         <div className="space-y-1.5">
           <Label htmlFor="catalog-file">เลือกไฟล์ catalog (CSV)</Label>
@@ -171,7 +171,7 @@ export function CatalogUpload() {
       )}
 
       {imported && parsed && (
-        <section className="space-y-3">
+        <section className="surface space-y-3 overflow-x-auto p-5 sm:p-6">
           <h2 className="text-lg font-semibold">{`ผลการอ่านไฟล์ ${imported.sourceName}`}</h2>
           <p className="text-sm">{`encoding ที่ตรวจเจอ: ${ENCODING_LABELS[parsed.encoding]}`}</p>
           <p className="text-sm">{`พบ ${parsed.dataLineCount} แถวในไฟล์, นำเข้าได้ ${parsed.items.length} รายการ`}</p>
@@ -187,11 +187,11 @@ export function CatalogUpload() {
           {parsed.items.length > 0 && (
             <>
               <table className="w-full text-left text-sm">
-                <caption className="pb-1 text-left text-zinc-600">
+                <caption className="pb-1 text-left text-muted-foreground">
                   {`ตัวอย่าง ${Math.min(PREVIEW_ROWS, parsed.items.length)} รายการแรก`}
                 </caption>
                 <thead>
-                  <tr className="border-b text-zinc-600">
+                  <tr className="border-b text-muted-foreground">
                     <th className="py-1 pr-2">sku</th>
                     <th className="py-1 pr-2">ชื่อ</th>
                     <th className="py-1 pr-2">หน่วย</th>
@@ -214,7 +214,7 @@ export function CatalogUpload() {
                   ? `นำเข้าเฉพาะแถวที่ถูก (${parsed.items.length} รายการ)`
                   : `นำเข้า catalog (${parsed.items.length} รายการ)`}
               </Button>
-              <p className="text-sm text-zinc-600">การนำเข้าจะแทนที่ catalog เดิมทั้งหมด</p>
+              <p className="text-sm text-muted-foreground">การนำเข้าจะแทนที่ catalog เดิมทั้งหมด</p>
             </>
           )}
         </section>

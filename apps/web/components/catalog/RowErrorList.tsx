@@ -20,7 +20,7 @@ export function RowErrorList({ errors }: RowErrorListProps) {
           <li key={`${error.row}-${error.column}-${index}`}>{formatRowError(error)}</li>
         ))}
       </ul>
-      {hidden > 0 && <p className="text-sm text-zinc-600">{`และอีก ${hidden} รายการ`}</p>}
+      {hidden > 0 && <p className="text-sm text-muted-foreground">{`และอีก ${hidden} รายการ`}</p>}
     </div>
   );
 }
